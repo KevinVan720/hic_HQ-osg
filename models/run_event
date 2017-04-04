@@ -1,0 +1,109 @@
+#!/bin/bash
+
+# job identification number
+id=1
+# check if id is given as input parameter
+# (like when running in condor job system)
+if [ $# -ne 0 ]
+then
+    id=$1
+fi
+
+tar -xzf hic_HQ-osg.tar.gz
+sleep 2
+
+# load necessary modules
+source /cvmfs/oasis.opensciencegrid.org/osg/modules/lmod/current/init/bash
+module load python/3.4 all-pkgs gcc boost hdf5 || exit 1
+
+nevent=50
+
+# start trento events
+####################################################################
+#######################################################################
+#########################################################################
+###########################################################################
+echo "STEP 1:   start trento...."
+cd hic_HQ-osg/trento
+./trento Pb Pb $nevent --cross-section 7.0 --grid-max 13.05 --grid-step 0.1 --normalization 160 --fluctuation 1.6 --nucleon-width 0.51 --output initial
+cd ..
+
+for ((i=0; i<$nevent; i++)); do
+    echo $i
+    sleep 2
+    cp trento/initial/$i.dat ./HQ_sample/initial.dat
+    cp trento/initial/$i.dat ./vishnew/initial.dat
+    
+    echo "STEP 2:   starting HQ sampler...."
+    cd HQ_sample
+    ./HQ_sample HQ_sample.conf > event_out$1-$i
+    cp initial_HQ.dat ../diffusion/initial_HQ$1-$i.dat
+    
+    echo "STEP 3:   starting hydro dynamics...."
+    cd ../vishnew
+    ./vishnew etas=0.08 etas_slope=0.75 vishbulknorm=1.1 edec=0.24
+    mv JetData.dat ../diffusion/JetData.dat
+    mv JetCtl.dat ../diffusion/JetCtl.dat
+
+
+####################################################################
+#######################################################################
+#########################################################################
+###########################################################################
+  
+    echo "STEP 4:   starting Langevin process...."
+    cd ../diffusion
+    export ftn10=dNg_over_dt_cD6.dat
+    export ftn20=HQ_AAcY$1-$i.dat
+    export ftn30=initial_HQ$1-$i.dat
+    ./diffusion  qhatMin=3.60154  qhatSlope=14.01154                                                  
+    mv HQ_AAcY$1-$i.dat ../fragPLUSrecomb/HQ_AAcY$1-$i.dat
+    
+    echo "STEP 5:   starting hadronization(frag & recomb)...."
+    cd ../fragPLUSrecomb
+    export ftn20=Dmeson_AAcY$1-$i.dat
+    cat HQ_AAcY$1-$i.dat | ./fragPLUSrecomb
+    
+    
+    echo "STEP 6:    starting processing events (bmsap) ...."
+    cd ../bmsap
+    mv ../vishnew/initial.dat initial$1-$i.dat
+    mv ../HQ_sample/initial_HQ.dat initial_HQ$1-$i.dat
+    mv ../fragPLUSrecomb/HQ_AAcY$1-$i.dat  .
+    mv ../fragPLUSrecomb/Dmeson_AAcY$1-$i.dat  .
+
+
+
+####################################################################
+#######################################################################
+#########################################################################
+###########################################################################
+ 
+  
+    ./processing_event_updated  $1-$i.dat PbPb5020
+    wc -l Dmeson_AAcY$1-$i.dat > Dmeson$1-$i.dat
+
+
+    echo "STEP 7:    starting saving data ..."
+    cd ../
+    mv HQ_sample/event_out$1-$i results/
+    mv bmsap/pp_angle$1-$i.dat results/
+    mv bmsap/Dmeson$1-$i.dat results/
+
+    mv bmsap/multi_AAcY_updated$1-$i.dat results/
+    mv bmsap/v2_AAcY_updated$1-$i.dat results/
+    mv bmsap/norotate_v2_AAcY_updated$1-$i.dat results/
+
+    rm bmsap/initial_HQ$1-$i.dat 
+    rm bmsap/initial$1-$i.dat 
+
+    rm bmsap/HQ_AAcY$1-$i.dat
+    rm bmsap/Dmeson_AAcY$1-$i.dat 
+    echo "FINISH...."
+done    
+    
+cd ..
+tar czf results$1.tar.gz hic_HQ-osg/results    
+    
+    
+    

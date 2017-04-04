@@ -1,0 +1,18 @@
+[submodule "models/trento"]
+	path = models/trento
+	url = git@github.com:Yingru/trento.git
+[submodule "models/HQ_sample"]
+	path = models/HQ_sample
+	url = git@github.com:Yingru/HQ_sample.git
+[submodule "models/vishnew"]
+	path = models/vishnew
+	url = git@github.com:Yingru/vishnew.git
+[submodule "models/diffusion"]
+	path = models/diffusion
+	url = git@github.com:Yingru/diffusion.git
+[submodule "models/fragPLUSrecomb"]
+	path = models/fragPLUSrecomb
+	url = git@github.com:Yingru/fragPLUSrecomb.git
+[submodule "models/bmsap"]
+	path = models/bmsap
+	url = git@github.com:Yingru/bmsap.git
