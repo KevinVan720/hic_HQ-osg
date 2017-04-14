@@ -16,3 +16,9 @@
 [submodule "models/bmsap"]
 	path = models/bmsap
 	url = git@github.com:Yingru/bmsap.git
+[submodule "models/osu-sampler"]
+	path = models/osu-sampler
+	url = git@github.com:Yingru/osu-sampler.git
+[submodule "models/urqmd-afterburner"]
+	path = models/urqmd-afterburner
+	url = git@github.com:Yingru/urqmd-afterburner.git
