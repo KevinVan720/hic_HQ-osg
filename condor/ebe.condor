@@ -26,4 +26,4 @@ log = log/ebe.log.$(Cluster)-$(Process)
 
 notification = NEVER
 
-queue 200
+queue 500
