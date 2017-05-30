@@ -32,13 +32,21 @@ def read_text_file(fileName):
     with open(fileName, 'rb') as f:
         return [l.split() for l in f if not l.startswith(b'#')]
 
-
 def run_initial(nevents):
     run_cmd('./trento Pb Pb', str(nevents),
         '--cross-section 6.4',
         '--grid-max 13.05 --grid-step 0.1',
         '--normalization 132 --fluctuation 1.6 --nucleon-width 0.51',
         '--output initial', cwd='trento')
+
+'''
+def run_initial(nevents):
+    run_cmd('./trento Au Au', str(nevents),
+        '--cross-section 4.2',
+        '--grid-max 13.05 --grid-step 0.1',
+        '--normalization 60  --fluctuation 1.6 --nucleon-width 0.49',
+        '--output initial', cwd='trento')
+'''
 
 
 def run_hydro():
@@ -50,11 +58,11 @@ def run_HQsample():
     run_cmd('./HQ_sample HQ_sample.conf', cwd='HQ_sample')
 
 
-def run_diffusion():
+def run_diffusion(args):
     os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
     os.environ['ftn20'] = 'HQ_AAcY.dat'
     os.environ['ftn30'] = 'initial_HQ.dat'
-    run_cmd('./diffusion qhatMin=3.6 qhatSlope=14.11', cwd='diffusion')
+    run_cmd('./diffusion', str(args), cwd='diffusion')
 
 
 def run_fragPLUSrecomb():
@@ -95,11 +103,11 @@ def participant_plane_angle():
 def bmsap_multi(collision_sys):
     sampleFile = 'sample_multi.in'
     if collision_sys == 'PbPb2760':
-        spectraFile = 'spectra/updated/LHC2760-AA2ccbar.dat'
+        spectraFile = 'spectra/LHC2760-AA2ccbar.dat'
     elif collision_sys == 'PbPb5020':
-        spectraFile = 'spectra/updated/LHC5020-AA2ccbar.dat'
+        spectraFile = 'spectra/LHC5020-AA2ccbar.dat'
     elif collision_sys == 'AuAu200':
-        spectraFile = 'spectra/updated/RHIC200-AA2ccbar.dat'
+        spectraFile = 'spectra/RHIC200-AA2ccbar.dat'
     else:
         print('not a valid collision system!!')
 
@@ -119,11 +127,11 @@ def bmsap_multi(collision_sys):
 def bmsap_v2(collision_sys):
     sampleFile = 'sample.in'
     if collision_sys == 'PbPb2760':
-        spectraFile = 'spectra/updated/LHC2760-AA2ccbar.dat'
+        spectraFile = 'spectra/LHC2760-AA2ccbar.dat'
     elif collision_sys == 'PbPb5020':
-        spectraFile = 'spectra/updated/LHC5030-AA2ccbar.dat'
-    elif colision_sys == 'AuAu200':
-        spectraFile = 'spectra/updated/RHIC200-AA2ccbar.dat'
+        spectraFile = 'spectra/LHC5030-AA2ccbar.dat'
+    elif collision_sys == 'AuAu200':
+        spectraFile = 'spectra/RHIC200-AA2ccbar.dat'
     else:
         print('not a valid collision system!!!')
 
@@ -178,17 +186,42 @@ def run_afterburner(ievent):
     return nsamples
 
 
-def Dmeson_Raa_v2(px, py, initial_pT, RaaFile, v2File):
-    pT_AA, dsigmadpT2_AA = np.loadtxt('LHC2760-AA2ccbar.dat', unpack=True)
+def Dmeson_Raa_v2(collision_sys, ID, px, py, initial_pT, RaaFile, v2File):
+    if collision_sys == 'PbPb2760':
+        pT_AA, dsigmadpT2_AA = np.loadtxt('LHC2760-AA2ccbar.dat', unpack=True)
+    elif collision_sys == 'PbPb5020':
+        pT_AA, dsigmadpT2_AA = np.loadtxt('LHC5020-AA2ccbar.dat', unpack=True)
+    elif collision_sys == 'AuAu200':
+        pT_AA, dsigmadpT2_AA = np.loadtxt('RHIC200-AA2ccbar.dat', unpack=True)
+    else:
+        print('not a valid collision system!')
     dsigmadpT_AA = pT_AA * dsigmadpT2_AA
     sigma_AA = dsigmadpT_AA.sum() * (pT_AA[1] - pT_AA[0])
     dsigmadpT_AA = dsigmadpT_AA / sigma_AA
     dfdpT = interp1d(pT_AA, dsigmadpT_AA)
-    pT_weight = dfdpT(initial_pT)
 
-    final_pT = np.sqrt(px**2 + py**2)
-    dNdpT, pT_bins = np.histogram(final_pT, bins=79, range=(0.5, 39.5), normed=True, weights=pT_weight)
-    np.savetxt(RaaFile, (dNdpT, pT_bins[:-1]))
+    final_pT = np.sqrt(px**2, py**2)
+
+    initial_pT_D0 = initial_pT[ID == 421]
+    final_pT_D0 = final_pT[ID==421]
+    pT_weight = dfdpT(initial_pT_D0)
+    dNdpT_D0, pT_bins = np.histogram(final_pT_D0, bins=79, range=(0.5, 40.0), weights=pT_weight)
+
+    initial_pT_Dplus = initial_pT[ID==411]
+    final_pT_Dplus = final_pT[ID==411]
+    pT_weight = dfdpT(initial_pT_Dplus)
+    dNdpT_Dplus, pT_bins = np.histogram(final_pT_Dplus, bins=79, range=(0.5, 40.0), weights=pT_weight)
+
+    initial_pT_Dstar = initial_pT[ID==10411]
+    final_pT_Dstar = final_pT[ID==10411]
+    pT_weight = dfdpT(initial_pT_Dstar)
+    dNdpT_Dstar, pT_bins = np.histogram(final_pT_Dstar, bins=79, range=(0.5, 40.0), weights=pT_weight)
+
+
+    pT_weight = dfdpT(initial_pT)
+    dNdpT, pT_bins = np.histogram(final_pT, bins=79, range=(0.5, 40.0), weights=pT_weight)
+   
+    np.savetxt(RaaFile, (pT_bins[:-1], dNdpT, dNdpT_D0, dNdpT_Dplus, dNdpT_Dstar), fmt='%10.6f')
 
 
     pT_bins = np.linspace(0.5, 39.5, 79)
@@ -210,10 +243,10 @@ def Dmeson_Raa_v2(px, py, initial_pT, RaaFile, v2File):
         weight_sum = pT_weight[cut].sum()
         v2.append(v2_sum/weight_sum)
 
-    np.savetxt(v2File, (np.array(v2), pT_bins[:-1]))
+    np.savetxt(v2File, (pT_bins[:-1], np.array(v2)), fmt='%10.6f')
 
 
-def calculate_variable(urqmdFile, nsamples):
+def calculate_variable(collision_sys, urqmdFile, nsamples):
     species = [
         ('pion', 211),
         ('kaon', 321),
@@ -232,6 +265,7 @@ def calculate_variable(urqmdFile, nsamples):
         ('mean_pT', [(s, float_t) for (s,_) in species]),
         ('M', int_t),
         ('Qn', complex_t, 6),
+        ('N_D', int_t),
     ])
 
     res['nsamples'] = nsamples
@@ -248,11 +282,12 @@ def calculate_variable(urqmdFile, nsamples):
     phi = np.arctan2(py, px)
     abs_ID = np.abs(ID)
     abs_eta = np.fabs(eta)
-    light_ID = ((abs_ID !=411) & (abs_ID !=412) & (abs_ID !=10411) & (abs_ID !=10412))
+    light_ID = ((abs_ID !=411) & (abs_ID !=421) & (abs_ID !=10411) & (abs_ID !=10421))
     charged = (charge != 0)
-    Dmeson_ID = ((abs_ID == 411) | (abs_ID == 412) | (abs_ID == 10411) | (abs_ID == 10412))
+    Dmeson_ID = ((abs_ID == 411) | (abs_ID == 421) | (abs_ID == 10411) | (abs_ID == 10421))
     midrapidity = (np.fabs(y) < 0.5)
 
+    res['N_D'] = np.count_nonzero(Dmeson_ID)
     res['dNch_deta'] = np.count_nonzero(charged & (abs_eta < 0.5) & light_ID) / nsamples
     phi_ALICE = phi[charged & (abs_eta < 0.8) & (pT > 0.2) & (pT < 5) & light_ID]
     res['M'] = phi_ALICE.size
@@ -263,6 +298,7 @@ def calculate_variable(urqmdFile, nsamples):
         print('# nsamples ' + '%5d'%res['nsamples'], file=fo)
         print('# dNch_deta ' + '%10.3e'%res['dNch_deta'], file=fo)
         print('# M ' + '%10d'%res['M'], file=fo)
+        print('# N_D' + '%10d'%res['N_D'], file=fo)
         print('# Q1 '+ str(res['Qn'][0][0]), file=fo)
         print('# Q2 '+ str(res['Qn'][0][1]), file=fo)
         print('# Q3 '+ str(res['Qn'][0][2]), file=fo)
@@ -280,18 +316,124 @@ def calculate_variable(urqmdFile, nsamples):
             print(str(name) + '%10.5f' %res['mean_pT'][name] + '%10.3e'%res['dN_dy'][name], file=fo)
 
     #------------------------------------------------------------------------------------------------
-    px_Dmeson = px[Dmeson_ID]
-    py_Dmeson = py[Dmeson_ID]
-    ipT_Dmeson = ipT[Dmeson_ID]
+    # Dmeson Raa and v2 (event-plane method)
+    px_Dmeson = px[Dmeson_ID & midrapidity]
+    py_Dmeson = py[Dmeson_ID & midrapidity]
+    ipT_Dmeson = ipT[Dmeson_ID & midrapidity]
+    ID_Dmeson = abs_ID[Dmeson_ID & midrapidity]
     RaaFile = 'multi_AAcY_urqmd.dat'
     v2File = 'v2_AAcY_urqmd.dat'
-    Dmeson_Raa_v2(px_Dmeson, py_Dmeson, ipT_Dmeson, RaaFile, v2File)
-    
+    Dmeson_Raa_v2(collision_sys, ID_Dmeson, px_Dmeson, py_Dmeson, ipT_Dmeson, RaaFile, v2File)
+  
+
+def calculate_diff_v2(collision_sys, urqmdFile, nsamples):
+    if collision_sys == 'PbPb2760':
+        pT_AA, dsigmadpT2_AA = np.loadtxt('LHC2760-AA2ccbar.dat', unpack=True)
+    elif collision_sys == 'PbPb5020':
+        pT_AA, dsigmadpT2_AA = np.loadtxt('LHC5020-AA2ccbar.dat', unpack=True)
+    elif collision_sys == 'AuAu200':
+        pT_AA, dsigmadpT2_AA = np.loadtxt('RHIC200-AA2ccbar.dat', unpack=True)
+    else:
+        print('not a valid system!')
+
+    dsigmadpT_AA = pT_AA * dsigmadpT2_AA
+    sigma_AA = dsigmadpT_AA.sum() * (pT_AA[1] - pT_AA[0])
+    dsigmadpT_AA = dsigmadpT_AA/sigma_AA
+    dfdpT = interp1d(pT_AA, dsigmadpT_AA)
+
+    float_t = '<f8'
+    int_t = '<i8'
+    complex_t = '<c16'
+
+    ID, charge, mass, px, py, pz, y, eta, ipT, wt = (
+        np.array(col, dtype=dtype) for (col, dtype) in 
+        zip(
+            zip(*read_text_file(urqmdFile)),
+            (2*[int] + 8*[float])
+        )
+    )
+
+    pT = np.sqrt(px**2 + py**2)
+    phi = np.arctan2(py,px)
+    abs_ID = np.abs(ID)
+    abs_eta = np.fabs(eta)
+    light_ID = ((abs_ID !=411) & (abs_ID != 421) & (abs_ID !=10411) & (abs_ID !=10421))
+    Dmeson_ID = (abs_ID == 411) | (abs_ID == 421) | (abs_ID == 10411) | (abs_ID == 10421)
+    charged = (charge != 0)
+    midrapidity = (np.fabs(y) < 0.5)
+
+    #-----------------------------------------------------------------------------------------------
+    # light hadron and D-meson differential v2
+    phi_ALICE = phi[charged & (abs_eta<0.8) & (pT>0.2) & (pT<5.0) & light_ID]
+    M_light = phi_ALICE.size
+    Q2 = np.exp(1j*2*phi_ALICE).sum()
+    Q3 = np.exp(1j*3*phi_ALICE).sum()
+
+    phi_ALICE_a = phi[charged & (eta<0.8) & (eta>0.0) & (pT>0.2) & (pT<5.0) & light_ID]
+    M_light_a = phi_ALICE_a.size
+    Q2a = np.exp(1j*2*phi_ALICE_a).sum()
+    Q3a = np.exp(1j*3*phi_ALICE_a).sum()
+
+    phi_ALICE_b = phi[charged & (eta>-0.8) & (eta<0.0) & (pT>0.2) & (pT<5.0) & light_ID]
+    M_light_b = phi_ALICE_b.size
+    Q2b = np.exp(1j*2*phi_ALICE_b).sum()
+    Q3b = np.exp(1j*2*phi_ALICE_b).sum()
+
+    cut_Dmeson = (midrapidity & (pT>0.5) & (pT<39.5) & Dmeson_ID)
+    phi_Dmeson = phi[cut_Dmeson]
+    ipT_Dmeson = ipT[cut_Dmeson]
+    pT_weight = dfdpT(ipT_Dmeson)
+
+    M_Dmeson = (pT_weight).sum()
+    Q2D = (np.exp(1j*2*phi_Dmeson) * pT_weight).sum()
+    Q3D = (np.exp(1j*3*phi_Dmeson) * pT_weight).sum()
+    Q4D = (np.exp(1j*4*phi_Dmeson) * pT_weight).sum()
+
+    resultFile = 'result_v2.dat'
+    with open(resultFile, 'w') as fo:
+        print('nsamples ' + '%5d'%nsamples, file=fo)
+        print('M ' + '%10d'%M_light, file=fo)
+        print('Q2 ' + str(Q2), file=fo)
+        print('Q3 ' + str(Q3), file=fo)
+        print('Ma ' + '%10d'%M_light_a, file=fo)
+        print('Q2a ' + str(Q2a), file=fo)
+        print('Q3a ' + str(Q3a), file=fo)
+        print('Mb ' + '%10d'%M_light_b, file=fo)
+        print('Q2b ' + str(Q2b), file=fo)
+        print('Q3b ' + str(Q3b), file=fo)
+        
+        print('M_Dmeson '+ '%10d'%M_Dmeson, file=fo)
+        print('Q2_Dmeson ' + str(Q2D), file=fo)
+        print('Q3_Dmeson ' + str(Q3D), file=fo)
+        print('Q4_Dmeson ' + str(Q4D), file=fo)
+
+        #-------------------------------------------------------------------------------
+        print('charged hardon q2: ', file=fo)
+        pT_bin = np.linspace(0.2, 5, 25)
+        for i in range(len(pT_bin)-1):
+            diff_cut = (charged & (abs_eta<0.8) & (pT>pT_bin[i]) & (pT<pT_bin[i+1]) & light_ID)
+            phi_diff = phi[diff_cut]
+            q2 = np.exp(1j*2*phi_diff).sum()
+            mq = np.count_nonzero(phi_diff)
+            print(str(pT_bin[i]) + '    ' + str(mq) + '    ' + str(q2), file=fo)
+
+        print('Dmeson q2: ', file=fo)
+        pT_bin2 = np.linspace(0.5, 39.5, 79)
+        for i in range(len(pT_bin2)-1):
+            diff_cut = (Dmeson_ID & (midrapidity) & (pT>pT_bin2[i]) & (pT<pT_bin2[i+1]))
+            phi_Dmeson = phi[diff_cut]
+            ipT_Dmeson = ipT[diff_cut]
+            pT_weight = dfdpT(ipT_Dmeson)
+            m_D = (pT_weight).sum()
+            q2_Dmeson = (np.exp(1j*2*phi_Dmeson) * pT_weight).sum()
+            print(str(pT_bin2[i]) + '    ' + str(m_D) + '    ' + str(q2_Dmeson), file=fo)
 
 
 def main():
-    nevents = 10
+    nevents = 20
     condor_ID = sys.argv[1]
+    fargs = open('args.conf', 'r')
+    args = fargs.readline()
     collision_sys = 'PbPb2760'
 
     run_initial(nevents)
@@ -314,7 +456,7 @@ def main():
         run_HQsample()
         shutil.move('HQ_sample/initial_HQ.dat', 'diffusion/initial_HQ.dat')
 
-        run_diffusion()
+        run_diffusion(args)
         shutil.move('diffusion/HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
 
         os.chdir('fragPLUSrecomb')
@@ -333,17 +475,22 @@ def main():
         nsamples = run_afterburner(ievent)
 
         if nsamples != 0:
-            shutil.copyfile('bmsap/spectra/updated/LHC2760-AA2ccbar.dat', 'urqmd-afterburner/LHC2760-AA2ccbar.dat')
+            shutil.copyfile('bmsap/spectra/LHC2760-AA2ccbar.dat', 'urqmd-afterburner/LHC2760-AA2ccbar.dat')
+            shutil.copyfile('bmsap/spectra/LHC5020-AA2ccbar.dat', 'urqmd-afterburner/LHC5020-AA2ccbar.dat')
+            shutil.copyfile('bmsap/spectra/RHIC200-AA2ccbar.dat', 'urqmd-afterburner/RHIC200-AA2ccbar.dat')
             os.chdir('urqmd-afterburner/')
-            calculate_variable('urqmd_final.dat', nsamples)        
+            calculate_variable(collision_sys, 'urqmd_final.dat', nsamples)
+            calculate_diff_v2(collision_sys, 'urqmd_final.dat', nsamples)
             os.chdir('../')
-            shutil.move('urqmd-afterburner/urqmd_final.dat', 'results/urqmd_final'+postfix)
+            #shutil.move('urqmd-afterburner/urqmd_final.dat', 'results/urqmd_final'+postfix)
+            shutil.move('urqmd-afterburner/urqmd_final.dat', 'urqmd_final' + postfix)
             shutil.move('urqmd-afterburner/result.dat', 'results/result'+postfix)
+            shutil.move('urqmd-afterburner/result_v2.dat', 'results/result_v2' + postfix)
             shutil.move('sampler/{0}.info.dat'.format(str(ievent)), 'results/event_info'+postfix)
-            #shutil.move('urqmd-afterburner/Dmeson_AAcY.dat', 'results/Dmeson_AAcY' + postfix)
             shutil.move('bmsap/multi_AAcY.dat', 'results/multi_AAcY'+postfix)
             shutil.move('bmsap/v2_AAcY.dat', 'results/v2_AAcY' + postfix)
             shutil.move('bmsap/initial.dat', 'results/initial' + postfix)
+            shutil.move('diffusion/initial_HQ.dat','results/initial_HQ'+postfix)
             shutil.move('urqmd-afterburner/pp_angle.dat', 'results/pp_angle'+postfix)
             shutil.move('urqmd-afterburner/multi_AAcY_urqmd.dat', 'results/multi_AAcY_urqmd'+postfix)
             shutil.move('urqmd-afterburner/v2_AAcY_urqmd.dat', 'results/v2_AAcY_urqmd'+postfix)
