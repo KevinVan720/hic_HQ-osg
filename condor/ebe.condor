@@ -1,5 +1,5 @@
 universe=vanilla
-# x509userproxy = /tmp/x509up_u6562
+x509userproxy = /tmp/x509up_u6562
 # specific the XSDED project to charge the job usage to - this is a 
 # required attribution for all jobs submitted on the OSG-XSEDE resource
 +ProjectName="Duke-QGP"
