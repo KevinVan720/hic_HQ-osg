@@ -29,12 +29,14 @@ cp ../args.conf .
 cd ../    
 tar czf results$1.tar.gz hic_HQ-osg/results    
 
-# transfer results
-# try to be fault-tolerant
+transferFile=results$1.tar.gz
+
+## transfer results
+## try to be fault-tolerant
 #globus() {
 #  globus-url-copy \
-#  -verbose -create-dest -restart -stall-timeout 30 results$1.tar.gz \
-#  gsiftp://ntheoryfs01.phy.duke.edu/var/phy/project/nukeserv/yx59/TEST/
+#  -verbose -create-dest -restart -stall-timeout 30 $transferFile \
+#  gsiftp://ntheoryfs01.phy.duke.edu/var/phy/project/nukeserv/yx59/summer2017/run79_AuAu200_param18/condor_00/
 #}
 
 #for i in {1..5}; do
