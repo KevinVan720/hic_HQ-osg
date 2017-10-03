@@ -1,5 +1,5 @@
 universe=vanilla
-x509userproxy = /tmp/x509up_u6562
+#x509userproxy = /tmp/x509up_u6562
 # specific the XSDED project to charge the job usage to - this is a 
 # required attribution for all jobs submitted on the OSG-XSEDE resource
 +ProjectName="Duke-QGP"
@@ -9,7 +9,7 @@ requirements = (OSGVO_OS_STRING == "RHEL 6") && (CVMFS_oasis_opensciencegrid_org
 request_memory = 2G
 request_disk = 4G
 
-executable = ./run_event
+executable = ./run_wrapper
 
 arguments = $(Process)
 
@@ -17,7 +17,7 @@ should_transfer_files = YES
 WhenToTransferOutput = ON_EXIT
 
 # fiels needed by the job
-transfer_input_files = hic_HQ-osg.tar.gz
+transfer_input_files = hic_HQ-osg.tar.gz, args.conf
 transfer_output_files = results$(Process).tar.gz
 
 output = log/ebe.out.$(Cluster)-$(Process)
@@ -26,4 +26,4 @@ log = log/ebe.log.$(Cluster)-$(Process)
 
 notification = NEVER
 
-queue 500
+queue 250
