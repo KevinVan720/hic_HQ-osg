@@ -22,3 +22,6 @@
 [submodule "models/urqmd-afterburner"]
 	path = models/urqmd-afterburner
 	url = git@github.com:Yingru/urqmd-afterburner.git
+[submodule "models/qhat_pQCD"]
+	path = models/qhat_pQCD
+	url = https://github.com/Yingru/qhat_pQCD.git
