@@ -13,7 +13,7 @@ run full space-time HQ evolution in heavy-ion collisions (seperated in several s
 import itertools 
 import sys, os
 import subprocess
-import numpy as np
+import numpy as n
 import h5py
 import shutil
 from scipy.interpolate import interp1d
@@ -33,14 +33,25 @@ def read_text_file(fileName):
     )
     return ID, charge, px, py, pz, y, eta, ipT
 
-def read_oscar_file(fileName):
-    with open(fileName, 'r') as f:
-        result = [l.replace('D','E').split() for l in f if len(l.split()) == 19]
 
-    NUM, ID, px, py, pz, p0, mass, rx, ry, rz, r0, temp, c_vx, c_vy, c_vz, ed, ip0, ipT, wt = (
-        np.array(col, dtype=dtype) for (col, dtype) in 
-        zip(zip(*result), (2*[int]+17*[float]))
-    )
+def read_oscar_file(fileName):
+    try:
+        with open(fileName, 'r') as f:
+            result = [l.replace('D','E').split() for l in f if len(l.split()) == 19]
+
+        NUM, ID, px, py, pz, p0, mass, rx, ry, rz, r0, temp, c_vx, c_vy, c_vz, ed, ip0, ipT, wt = (
+            np.array(col, dtype=dtype) for (col, dtype) in 
+            zip(zip(*result), (2*[int]+17*[float]))
+        )
+    except ValueError as e:
+        handle = str(e).split()[-1]
+        with open(fileName, 'r') as f:
+            result = [l.replace('D', 'E').replace(handle, ' 0 ').split() for l in f if len(l.split()) == 19]
+            NUM, ID, px, py, pz, p0, mass, rx, ry, rz, r0, temp, c_vx, c_vy, c_vz, ed, ip0, ipT, wt = (
+                np.array(col, dtype=dtype) for (col, dtype) in 
+                zip(zip(*result), (2*[int]+17*[float]))
+            )
+
     return ID, px, py, pz, p0, ipT
 
 
@@ -74,6 +85,9 @@ def run_hydro():
 def run_HQsample():
     run_cmd('./HQ_sample HQ_sample.conf', cwd='HQ_sample')
 
+
+def run_qhat(args):
+    run_cmd('./Scattering', str(args), cwd='Scattering')
 
 def run_diffusion(args):
     os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
@@ -232,7 +246,7 @@ def calculate_Dmeson_Raa(collision_sys, ID, px, py, initial_pT):
 
     Raa_result = []
     pT_weight = dfdpT(initial_pT)
-    dNdpT, pT_bins = np.histogram(final_pT, bins=140, range=(0,70.0), weights=pT_weight)
+    dNdpT, pT_bins = np.histogram(final_pT, bins=280, range=(0,140.0), weights=pT_weight)
     Raa_result.append(pT_bins[:-1])
     Raa_result.append(dNdpT)
 
@@ -241,7 +255,7 @@ def calculate_Dmeson_Raa(collision_sys, ID, px, py, initial_pT):
         final_pT_label = final_pT[ID==label]
         if (len(initial_pT_label) > 0):
             pT_weight = dfdpT(initial_pT_label)
-            dNdpT_, pT_bins = np.histogram(final_pT_label, bins=140, range=(0, 70.0), weights=pT_weight)
+            dNdpT_, pT_bins = np.histogram(final_pT_label, bins=280, range=(0, 140.0), weights=pT_weight)
             Raa_result.append(dNdpT_)
     
     return np.array(Raa_result).T
@@ -282,7 +296,7 @@ def calculate_Dmeson_v2_EP(collision_sys, ID, px, py, initial_pT):
     final_v2_with_weight = final_v2 * pT_weight
 
     v2_result = []
-    pT_bins = np.linspace(0.0, 70.0, 141)
+    pT_bins = np.linspace(0.0, 140.0, 281)
     v2_result.append(pT_bins[:-1])
 
     dum_v2 = []
@@ -359,7 +373,7 @@ def calculate_Dmeson_v2_cumulant(collision_sys, ID, px, py, phi, initial_pT):
     final_v2_with_weight = final_v2 * pT_weight
 
     v2_result = []
-    pT_bins = np.linspace(0.0, 70.0, 141)
+    pT_bins = np.linspace(0.0, 140.0, 281)
     v2_result.append(pT_bins[:-1])
 
     dum_q2 = []
@@ -413,20 +427,40 @@ def calculate_Dmeson_dNdydpT(collision_sys, px, py, initial_pT):
     final_pT = np.sqrt(px**2 + py**2)
     pT_weight = dfdpT(initial_pT)
 
-    dNdpT, pT_bins = np.histogram(final_pT, bins=140, range=(0.0, 70.0), weights=pT_weight)
+    dNdpT, pT_bins = np.histogram(final_pT, bins=280, range=(0.0, 140.0), weights=pT_weight)
     return dNdpT, pT_bins[:-1]
 
 
 
-def calculate_Dmeson_beforeUrQMD(collision_sys, DmesonFile):
+def calculate_beforeUrQMD(collision_sys, ievent, DmesonFile):
     ID, px, py, pz, p0, ipT = read_oscar_file(DmesonFile)
     abs_ID = np.abs(ID)
-    y = 0.5 * np.log((p0+pz)/(p0-pz))
-    resultFile = 'result_Dmeson_beforeUrQMD.hdf5'
+    y = 0.5 * np.log((p0 + pz)/(p0 - pz))
+    resultFile = 'result_beforeUrQMD.hdf5'
     fres = h5py.File(resultFile, 'w')
+
+    #---------------- light hadron --------------------
+    group_light = fres.create_group('light hadron')
+    infoFile = '../urqmd-afterburner/{}.info.dat'.format(ievent)
+    i = 2
+    with open(infoFile, 'r') as finfo:
+        for line in finfo:
+            inputline = line.split()
+            if len(inputline) == 3:
+                if group_light.attrs.get(inputline[0], 0) == 0:
+                    group_light.attrs.create(inputline[0], float(inputline[2]))
+                else:
+                    i += 1
+                    group_light.attrs.create(inputline[0]+str(i), float(inputline[2]))
+
+    initialFile = 'initial.dat'
+    dum_sd = np.loadtxt(initialFile)
+    dum_weight = (dum_sd*dum_sd).sum()
+    group_light.attrs.create('weight-TAA', dum_weight)
+
+    #------------ Dmeson midrapidity ------------------------
     group_Dmeson = fres.create_group('Dmeson')
 
-    #---------- Dmeson midrapidity ---------------
     midrapidity = (np.fabs(y) < 0.5)
     ID_Dmeson = ID[midrapidity]
     px_Dmeson = px[midrapidity]
@@ -460,7 +494,7 @@ def calculate_Dmeson_beforeUrQMD(collision_sys, DmesonFile):
 
 
 
-def calculate_Dmeson_afterUrQMD(collision_sys, ievent):
+def calculate_afterUrQMD(collision_sys, ievent, nsamples):
     urqmd_outputFile = 'urqmd_final.dat'
     resultFile = 'result_Dmeson_afterUrQMD.hdf5'.format(ievent)
     fres = h5py.File(resultFile, 'w')
@@ -513,21 +547,9 @@ def calculate_Dmeson_afterUrQMD(collision_sys, ievent):
     ds_multi.attrs.create('y_max', 3.0)
     ds_multi.attrs.create('dy', 0.1)
 
-    fres.close()
-    
 
-
-def calculate_lightHadron_afterUrQMD(ievent, nsamples):
-    """
-    input: ievent(int); nsamples (int)
-    output: processed light/charged hardon data
-    """
-    urqmd_outputFile = 'urqmd_final.dat'
-    resultFile = 'result_light.hdf5'.format(ievent)
-    fres = h5py.File(resultFile, 'w')
-
+    #----------- light hadron ----------------------
     group_light = fres.create_group('light hadron')
-
     infoFile = '{}.info.dat'.format(ievent)
     i = 2
     with open(infoFile, 'r') as finfo:
@@ -558,7 +580,7 @@ def calculate_lightHadron_afterUrQMD(ievent, nsamples):
     group_light.attrs.create('nsamples', nsamples)
     ## dNch_deta
     H, bins = np.histogram(eta[charged], range=(-5,5), bins=100)
-    dNch_deta = H / nsamples
+    dNch_deta = H / nsamples / (bins[1]- bins[0])
     dataset_dNchdeta = group_light.create_dataset('dNch_deta', data=dNch_deta)
     dataset_dNchdeta.attrs.create('etamin', -5)
     dataset_dNchdeta.attrs.create('etamax', 5)
@@ -615,15 +637,18 @@ def calculate_lightHadron_afterUrQMD(ievent, nsamples):
     fres.close()
 
 
-
-
-
 def main():
-    nevents = 20
-    condor_ID = sys.argv[1]
-    fargs = open('args.conf', 'r')
-    args = fargs.readline()
     collision_sys = 'PbPb5020'
+    nevents = 10
+
+    # parse the config file
+    if len(sys.argv) == 3:
+        with open(sys.argv[1], 'r') as f:
+            config = dict((i.strip() for i in l.split('=', maxsplit=1)) for l in f)
+            condor_ID = sys.argv[2]
+    else:
+        config = {}
+        condor_ID = 0
 
     run_initial(collision_sys, nevents)
 
@@ -638,15 +663,16 @@ def main():
         shutil.copyfile(initial_info_File, 'sampler/{}.info.dat'.format(ievent))
         shutil.copyfile(initial_info_File, 'urqmd-afterburner/{}.info.dat'.format(ievent))
 
-
         run_hydro()
         shutil.move('vishnew/surface.dat', 'sampler/surface.dat')
         shutil.move('vishnew/JetData.h5', 'diffusion/JetData.h5')
 
         run_HQsample()
         shutil.move('HQ_sample/initial_HQ.dat', 'diffusion/initial_HQ.dat')
+        
+        run_qhat(config.get('qhat_args', ''))
 
-        run_diffusion(args)
+        run_diffusion(config.get('diffusion_args', ''))
         shutil.move('diffusion/HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
 
         os.chdir('fragPLUSrecomb/')
@@ -658,7 +684,7 @@ def main():
         participant_plane_angle()
         bmsap_multi(collision_sys)
         bmsap_v2(collision_sys)
-        calculate_Dmeson_beforeUrQMD(collision_sys, 'Dmeson_AAcY.dat')
+        calculate_beforeUrQMD(collision_sys, ievent, 'Dmeson_AAcY.dat')
 
         os.chdir('../')
         shutil.move('bmsap/Dmeson_AAcY.dat', 'urqmd-afterburner/Dmeson_AAcY.dat')
@@ -672,22 +698,24 @@ def main():
                 shutil.copyfile('bmsap/spectra/LHC5020-AA2ccbar.dat', 'urqmd-afterburner/LHC5020-AA2ccbar.dat')
                 shutil.copyfile('bmsap/spectra/RHIC200-AA2ccbar.dat', 'urqmd-afterburner/RHIC200-AA2ccbar.dat')
             os.chdir('urqmd-afterburner/')
-            calculate_lightHadron_afterUrQMD(ievent, nsamples)            
-            calculate_Dmeson_afterUrQMD(collision_sys, ievent)
-            # try to store the files (not neccessary to transfer those back)
+            calculate_afterUrQMD(collision_sys, ievent, nsamples)
+
+            # try to store the files 
             shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('urqmd_input.dat', 'urqmd_input{}-{}.dat'.format(condor_ID, ievent))
 
             os.chdir('../')
-            shutil.move('urqmd-afterburner/result_light.hdf5', 'results/result_light{}-{}.hdf5'.format(condor_ID, ievent))
             shutil.move('urqmd-afterburner/result_Dmeson_afterUrQMD.hdf5', 'results/result_Dmeson_afterUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
             shutil.move('bmsap/multi_AAcY.dat', 'results/multi_AAcY{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('bmsap/v2_AAcY.dat', 'results/v2_AAcY{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('bmsap/result_Dmeson_beforeUrQMD.hdf5', 'results/result_Dmeson_beforeUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
+
         else:
             print('No particle produced in this event!')
             continue
+
+        
 
 
 if __name__ == '__main__':
