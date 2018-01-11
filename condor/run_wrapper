@@ -26,7 +26,7 @@ export LD_LIBRARY_PATH=/cvmfs/oasis.opensciencegrid.org/osg/modules/gcc/6.2.0/li
 cd hic_HQ-osg/
 cp ../args.conf .
 ldd fragPLUSrecomb/fragPLUSrecomb
-./run-events $1
+./run-events args.conf $1
 
 cd ../    
 tar czf results$1.tar.gz hic_HQ-osg/results    
