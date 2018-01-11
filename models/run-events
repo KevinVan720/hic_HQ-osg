@@ -623,7 +623,8 @@ def main():
     condor_ID = sys.argv[1]
     fargs = open('args.conf', 'r')
     args = fargs.readline()
-    collision_sys = 'PbPb5020'
+    #collision_sys = 'PbPb5020'
+    collision_sys = 'AuAu200'
 
     run_initial(collision_sys, nevents)
 
