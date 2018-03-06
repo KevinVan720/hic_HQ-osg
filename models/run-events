@@ -66,6 +66,7 @@ def run_initial(collision_sys, nevents):
          run_cmd('./trento Pb Pb ', str(nevents),
                 '--cross-section 7.0',
                 '--grid-max 13.05 --grid-step 0.1',
+                '--b-min 6.0 --b-max 7.0',
                 '--normalization 160 --fluctuation 1.6 --nucleon-width 0.51',
                 '--output initial', cwd='trento')
     elif collision_sys == 'PbPb2760':
@@ -282,7 +283,7 @@ def calculate_Dmeson_Raa(collision_sys_, ID_, px_, py_, initial_pT_):
 
     Raa_result = []
     pT_weight = dfdpT(initial_pT_)
-    dNdpT, pT_bins = np.histogram(final_pT, bins=280, range=(0, 140.0), weights = pT_weight)
+    dNdpT, pT_bins = np.histogram(final_pT, bins=100, range=(0, 100.0), weights = pT_weight)
     Raa_result.append(pT_bins[:-1])
     Raa_result.append(dNdpT)
 
@@ -304,22 +305,22 @@ def calculate_Dmeson_Raa(collision_sys_, ID_, px_, py_, initial_pT_):
     px_eve = px_ * np.cos(angle) - py_ * np.sin(angle)
     py_eve = px_ * np.sin(angle) + py_ * np.cos(angle)
 
-    dNdpx, px_bins = np.histogram(px_eve, bins=280, range=(-140.0, 140.0), weights = pT_weight)
+    dNdpx, px_bins = np.histogram(px_eve, bins=100, range=(-100.0, 100.0), weights = pT_weight)
     Raa_result.append(dNdpx)
 
-    dNdpx, px_bins = np.histogram(np.abs(px_eve), bins=280, range=(0, 140.0), weights = pT_weight)
+    dNdpx, px_bins = np.histogram(np.abs(px_eve), bins=100, range=(0, 100.0), weights = pT_weight)
     Raa_result.append(dNdpx)
 
-    dNdpx, px_bins = np.histogram(px_eve**2, bins=280, range=(0, 140.0), weights = pT_weight)
+    dNdpx, px_bins = np.histogram(px_eve**2, bins=100, range=(0, 100.0), weights = pT_weight)
     Raa_result.append(dNdpx)
 
-    dNdpy, px_bins = np.histogram(py_eve, bins=280, range=(-140.0, 140.0), weights = pT_weight)
+    dNdpy, px_bins = np.histogram(py_eve, bins=100, range=(-100.0, 100.0), weights = pT_weight)
     Raa_result.append(dNdpy)
 
-    dNdpy, px_bins = np.histogram(np.abs(py_eve), bins=280, range=(0, 140.0), weights = pT_weight)
+    dNdpy, px_bins = np.histogram(np.abs(py_eve), bins=100, range=(0, 100.0), weights = pT_weight)
     Raa_result.append(dNdpy)
 
-    dNdpy, px_bins = np.histogram(py_eve**2, bins=280, range=(0, 140.0), weights = pT_weight)
+    dNdpy, px_bins = np.histogram(py_eve**2, bins=100, range=(0, 100.0), weights = pT_weight)
     Raa_result.append(dNdpy)
     ### ------------------ end of outputing the px, py distribution ------------------
 
@@ -330,7 +331,7 @@ def calculate_Dmeson_Raa(collision_sys_, ID_, px_, py_, initial_pT_):
         final_pT_label = final_pT[ID_ == label]
         if (len(initial_pT_label) > 0):
             pT_weight = dfdpT(initial_pT_label)
-            dNdpT_, pT_bins = np.histogram(final_pT_label, bins=280, range=(0, 140.0), weights=pT_weight)
+            dNdpT_, pT_bins = np.histogram(final_pT_label, bins=100, range=(0, 100.0), weights=pT_weight)
             Raa_result.append(dNdpT_)
 
     return np.array(Raa_result).T
@@ -372,7 +373,7 @@ def calculate_Dmeson_v2_EP(collision_sys_, ID_, px_, py_, initial_pT_):
     final_v2_with_weight = final_v2 * pT_weight
 
     v2_result = []
-    pT_bins = np.linspace(0.0, 140.0, 281)
+    pT_bins = np.linspace(0.0, 100.0, 101)
     v2_result.append(pT_bins[:-1])
 
     dum_v2 = []
@@ -396,7 +397,7 @@ def calculate_Dmeson_v2_EP(collision_sys_, ID_, px_, py_, initial_pT_):
             dum_v2 = []
             dum_weight = []
             for i in range(len(pT_bins) -1):
-                cut = (final_pT > pT_bins[i]) & (final_pT < pT_bins[i+1]) & (ID_ == label)
+                cut = (final_pT >= pT_bins[i]) & (final_pT < pT_bins[i+1]) & (ID_ == label)
                 v2_sum = final_v2_with_weight[cut].sum()
                 weight_sum = pT_weight[cut].sum()
                 try:
@@ -447,7 +448,7 @@ def calculate_Dmeson_v2_cumulant(collision_sys_, ID_, px_, py_, phi_, initial_pT
     final_v2_with_weight = final_v2 * pT_weight
 
     v2_result = []
-    pT_bins = np.linspace(0.0, 140.0, 281)
+    pT_bins = np.linspace(0.0, 100.0, 101)
     v2_result.append(pT_bins[:-1])
 
     dum_q1 = []
@@ -457,7 +458,7 @@ def calculate_Dmeson_v2_cumulant(collision_sys_, ID_, px_, py_, phi_, initial_pT
     dum_mD = []
 
     for i in range(len(pT_bins) -1):
-        cut = (final_pT > pT_bins[i]) & (final_pT < pT_bins[i+1])
+        cut = (final_pT >= pT_bins[i]) & (final_pT < pT_bins[i+1])
         phi_Dmeson = phi_[cut]
         pT_weight_Dmeson = pT_weight[cut]
         q1 = (np.exp(1j*1*phi_Dmeson) * pT_weight_Dmeson).sum()
@@ -501,24 +502,14 @@ def calculate_Dmeson_dNdphidpT(collision_sys_, px_, py_, phi_, initial_pT_):
     sigma_AA = dsigmadpT_AA.sum() * (pT_AA[1] - pT_AA[0])
     dsigmadpT_AA = dsigmadpT_AA / sigma_AA
     dfdpT = interp1d(pT_AA, dsigmadpT_AA)
+    
+    pT_ = np.sqrt(px_**2 + py_**2)
+    pT_weight = dfdpT(initial_pT_)
 
-    phi_bins = np.linspace(-np.pi, np.pi, 360)
-    Raa_result = []
-    for i in range(len(phi_bins) - 1):
-        cut = (phi_ > phi_bins[i]) & (phi_ < phi_bins[i+1])
-        px_Dmeson = px_[cut]
-        py_Dmeson = py_[cut]
-        ipT_Dmeson = initial_pT_[cut]
-        final_pT = np.sqrt(px_Dmeson**2 + py_Dmeson**2)
-        pT_weight = dfdpT(ipT_Dmeson)
+    H, xbins, ybins = np.histogram2d(pT_, phi_, bins=(100, 50), range=[[0, 100], [-np.pi, np.pi]], weights=pT_weight)
 
-        dNdpT, pT_bins = np.histogram(final_pT, bins=280, range=(0.0, 140.0), weights=pT_weight)
+    return (H, xbins, ybins)
 
-        if len(Raa_result) == 0:
-            Raa_result.append(pT_bins[:-1])
-        Raa_result.append(dNdpT)
-
-    return np.array(Raa_result).T
 
 
 def calculate_Dmeson_dNdydpT(collision_sys_, px_, py_, y_, initial_pT_):
@@ -542,23 +533,11 @@ def calculate_Dmeson_dNdydpT(collision_sys_, px_, py_, y_, initial_pT_):
     dsigmadpT_AA = dsigmadpT_AA / sigma_AA
     dfdpT = interp1d(pT_AA, dsigmadpT_AA)
 
- 
-    y_bins = np.linspace(-3.0, 3.0, 61)
-    Raa_result = []
-    for i in range(len(y_bins) - 1):
-        cut = (y_>y_bins[i]) & (y_<y_bins[i+1])
-        px_Dmeson = px_[cut]
-        py_Dmeson = py_[cut]
-        ipT_Dmeson = initial_pT_[cut]
-        final_pT = np.sqrt(px_Dmeson**2 + py_Dmeson**2)
-        pT_weight = dfdpT(ipT_Dmeson)
+    pT_ = np.sqrt(px_**2 + py_**2)
+    pT_weight = dfdpT(initial_pT_)
+    H, xbins, ybins = np.histogram2d(pT_, y_, bins=(100, 60), range=[[0, 100], [-3, 3]], weights=pT_weight)
 
-        dNdpT, pT_bins = np.histogram(final_pT, bins=280, range=(0.0, 140.0), weights=pT_weight)
-        if len(Raa_result) == 0:
-            Raa_result.append(pT_bins[:-1])
-        Raa_result.append(dNdpT)
-
-    return np.array(Raa_result).T
+    return (H, xbins, ybins)
 
 
 
@@ -606,15 +585,15 @@ def calculate_beforeUrQMD(collision_sys, ievent, DmesonFile):
     group_Dmeson.create_dataset('v2_Dmeson_y_lt_0d5_EP', data = v2_result)
  
     # ----------- Dmeson dNdpTdy
-    Raa_result = calculate_Dmeson_dNdydpT(collision_sys, px, py, y, ipT)
+    (Raa_result, bin1, bin2) = calculate_Dmeson_dNdydpT(collision_sys, px, py, y, ipT)
     ds_multi = group_Dmeson.create_dataset('multi_Dmeson_dNdydpT', data = Raa_result)
-    ds_multi.attrs.create('y_min', -3.0)
-    ds_multi.attrs.create('y_max', 3.0)
-    ds_multi.attrs.create('dy', 0.1)
+    ds_multi.attrs.create('pT_min', bin1[0])
+    ds_multi.attrs.create('pT_max', bin1[-1])
+    ds_multi.attrs.create('dpT', bin1[1] - bin1[0])
+    ds_multi.attrs.create('y_min', bin2[0])
+    ds_multi.attrs.create('y_max', bin2[-1])
+    ds_multi.attrs.create('dy', bin2[1] - bin2[0])
   
-    # ---------- Dmeson dNdpTdphi  (mid-rapidity)
-    Raa_result = calculate_Dmeson_dNdphidpT(collision_sys, px_Dmeson, py_Dmeson, phi_Dmeson, ipT_Dmeson)
-
     fres.close()
 
 
@@ -664,12 +643,15 @@ def calculate_afterUrQMD(collision_sys, ievent, nsamples):
     phi_Dmeson = phi[Dmeson_ID]
     eta_Dmeson = eta[Dmeson_ID]
     ipT_Dmeson = ipT[Dmeson_ID]
-    Raa_result = calculate_Dmeson_dNdydpT(collision_sys, px_Dmeson, py_Dmeson, y_Dmeson, ipT_Dmeson)
+    (Raa_result, bin1, bin2) = calculate_Dmeson_dNdydpT(collision_sys, px_Dmeson, py_Dmeson, y_Dmeson, ipT_Dmeson)
     ds_multi = group_Dmeson.create_dataset('multi_Dmeson_dNdydpT', data = Raa_result)
-    ds_multi.attrs.create('y_min', -3.0)
-    ds_multi.attrs.create('y_max', 3.0)
-    ds_multi.attrs.create('dy', 0.1)
-
+    ds_multi.attrs.create('pT_min', bin1[0])
+    ds_multi.attrs.create('pT_max', bin1[-1])
+    ds_multi.attrs.create('dpT', bin1[1] - bin1[0])
+    ds_multi.attrs.create('y_min', bin2[0])
+    ds_multi.attrs.create('y_max', bin2[-1])
+    ds_multi.attrs.create('dy', bin2[1] - bin2[0])
+ 
     #### --- Dmeson dNdpTdphi (mid-rapidity)
     def write_rapidity_dNdphi(ycut):
         midrapidity = (np.fabs(y) < ycut)
@@ -679,11 +661,15 @@ def calculate_afterUrQMD(collision_sys, ievent, nsamples):
         dum_ipT = ipT[Dmeson_ID & midrapidity]
         dum_phi = phi[Dmeson_ID & midrapidity]
 
-        Raa_result = calculate_Dmeson_dNdphidpT(collision_sys, dum_px, dum_py, dum_phi, dum_ipT)
+        Raa_result, bin1, bin2 = calculate_Dmeson_dNdphidpT(collision_sys, dum_px, dum_py, dum_phi, dum_ipT)
         ds_multi2 = group_Dmeson.create_dataset('multi_Dmeson_dNdphidpT_y_lt_%s'%ycut, data = Raa_result)
-        ds_multi2.attrs.create('phi_min', -np.pi)
-        ds_multi2.attrs.create('phi_max', np.pi)
-        ds_multi2.attrs.create('n_phi', 360)
+        ds_multi2.attrs.create('pT_min', bin1[0])
+        ds_multi2.attrs.create('pT_max', bin1[-1])
+        ds_multi2.attrs.create('dpT', bin1[1] - bin1[0])
+        ds_multi2.attrs.create('phi_min', bin2[0])
+        ds_multi2.attrs.create('phi_max', bin2[1])
+        ds_multi2.attrs.create('dphi', bin2[1] - bin2[0])
+
 
     write_rapidity_dNdphi(0.5)
     write_rapidity_dNdphi(0.8)
@@ -772,6 +758,17 @@ def calculate_afterUrQMD(collision_sys, ievent, nsamples):
     ds_flow2.attrs.create('integrated_M', np.count_nonzero(phi_ALICE))
     ds_flow2.attrs.create('integrated_Ma', np.count_nonzero(phi_ALICE_a))
     ds_flow2.attrs.create('integrated_Mb', np.count_nonzero(phi_ALICE_b))
+
+
+    ## light hadron distribution
+    H_light, bin1, bin2 = np.histogram2d(pT[charged & (abs_eta<0.8)], phi[charged & (abs_eta<0.8)], bins=(25, 50), range=[[0, 5], [-np.pi, np.pi]])
+    ds_dNdphi = group_light.create_dataset('dNdpTdphi', data=H_light)
+    ds_dNdphi.attrs.create('pT_min', bin1[0])
+    ds_dNdphi.attrs.create('pT_max', bin1[-1])
+    ds_dNdphi.attrs.create('dpT', bin1[1]-bin1[0])
+    ds_dNdphi.attrs.create('phi_min', bin2[0])
+    ds_dNdphi.attrs.create('phi_max', bin2[-1])
+    ds_dNdphi.attrs.create('dphi', bin2[1]-bin2[0])
 
     fres.close()
 
