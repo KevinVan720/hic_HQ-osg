@@ -27,4 +27,4 @@
 	url = git@github.com:Yingru/qhat_pQCD.git
 [submodule "models/HMDecay"]
 	path = models/HMDecay
-	url = git@github.com:Yingru/fragPLUSrecomb.git
+	url = git@github.com:Yingru/HMDecay.git
