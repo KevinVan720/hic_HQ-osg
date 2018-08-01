@@ -5,7 +5,7 @@ universe=vanilla
 +ProjectName="Duke-QGP"
 
 # requirements is an expression to specify machines that can run jobs
-requirements = (OSGVO_OS_STRING == "RHEL 6") && (CVMFS_oasis_opensciencegrid_org_REVISION >= 3467)
+requirements = (OSGVO_OS_STRING == "RHEL 6" || OSGVO_OS_STRING == "RHEL 7") && (CVMFS_oasis_opensciencegrid_org_REVISION >= 3467) && (HAS_MODULES == True)
 request_memory = 2G
 request_disk = 4G
 
@@ -17,7 +17,7 @@ should_transfer_files = YES
 WhenToTransferOutput = ON_EXIT
 
 # fiels needed by the job
-transfer_input_files = hic_HQ-osg.tar.gz, args.conf
+transfer_input_files = hic_HQ-osg.tar.gz, args.conf, inputfile
 transfer_output_files = results$(Process).tar.gz
 
 output = log/ebe.out.$(Cluster)-$(Process)

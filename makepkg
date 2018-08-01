@@ -1,5 +1,8 @@
 #!/bin/bash
 
+export CFLAGS='-ffast-math'
+export FFLAGS=$CFLAGS
+export CXXFLAGS=$CFLAGS
 
 # extra preparation when compiling on the OSG submit host
 load_osg(){
@@ -13,7 +16,10 @@ load_osg(){
   #  - hdf5 for trento
   #  - python and packages for generating the vishnew EOS table
   module purge
-  module load gcc/6.2.0 cmake boost/1.62.0 gsl/2.3 hdf5/1.8.13 python/3.5.2 all-pkgs
+  module load gcc/6.2.0 cmake boost/1.62.0-cxx11 gsl/2.3 python/3.5.2 all-pkgs
+  module load hdf5/1.8.20-cxx11
+  module list
+
 
   # the modules set the standard environment variables CPATH and LIBRARY_PATH
   # set corresponding variables for cmake
@@ -21,9 +27,10 @@ load_osg(){
   export CMAKE_LIBRARY_PATH=$LIBRARY_PATH
 
   # set c++ and fortran compiler flags
-  export CFLAGS="-march=x86-64 -mtune=intel"
+  export CFLAGS="-march=x86-64 -mtune=intel -ffast-math"
   export FFLAGS="$CFLAGS"
-  export CXXFLAGS="-march=x86-64 -mtune=intel -D_GLIBCXX_USE_CXX11_ABI=0"
+  #export CXXFLAGS="-march=x86-64 -mtune=intel -D_GLIBCXX_USE_CXX11_ABI=0"
+  export CXXFLAGS="$CFLAGS"
 
 
   # explicitly set fortran compiler to override cmake default
@@ -39,40 +46,58 @@ if [[ $(hostname) == 'xd-login.opensciencegrid.org' ]]; then
   load_osg
 fi
 
-pkgname='hic_HQ-osg'
-
 # create a temporary directory for installing files
 installdir=$(mktemp --directory)
 # and ensure it's cleaned on exit
 trap "rm -r $installdir" EXIT
 
+pkgname='hic_HQ-osg'
+pkgdir="$installdir/$pkgname"
+
+
 # build each model
 for i in models/*/; do
   pushd $i
 
-  if [[ $(basename $i) == "vishnew" || $(basename $i) == "diffusion" ]] && [[ $(hostname) =~ opensciencegrid.org|osgconnect.net ]]; then
+  if [[ $(basename $i) == "vishnew" || $(basename $i) == "diffusion" ]] && [[ $(hostname) =~ opensciencegrid.org || osgconnect.net ]]; then
     module unload gcc
     FC=/cvmfs/oasis.opensciencegrid.org/osg/modules/hdf5/1.8.13/bin/h5fc
     FFLAGS='-march=x86-64 -ffast-math'
   fi
 
-  # create build directory and run cmake if necessary
-  if [[ -d build ]]; then
-    cd build
+  if [[ -f CMakeLists.txt ]]; then
+    # create build directory and run cmake if necessary
+    if [[ -d build ]]; then
+      cd build
+    else
+      mkdir build && cd build
+      # disable install prefix by setting it to "/"
+      # the actual install location will be set by DESTDIR later
+      cmake \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DCMAKE_INSTALL_PREFIX="/" \
+        .. || exit 1
+    fi
+
+    # compile and install to the temporary directory
+    make --jobs=$(nproc) DESTDIR=$pkgdir install || exit 1
+  elif [[ -f setup.py ]]; then
+    # install python packages
+    python3 setup.py install \
+      --no-compile \
+      --root=$pkgdir \
+      --prefix= \
+      || exit 1
+
+    # let python find packages in the temperary directory -- this is necessrary for frzout
+    export PYTHONPATH=$PYTHONPATH:"$(echo $pkgdir/lib*/python*/site-packages)"
   else
-    mkdir build && cd build
-    # disable install prefix by setting it to "/"
-    # the actual install location will be set by DESTDIR later
-    cmake \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DCMAKE_INSTALL_PREFIX="/" \
-      .. || exit 1
+    echo "unknown build system for model "
+    exit 1
   fi
 
-  # compile and install to the temporary directory
-  make --jobs=$(nproc) DESTDIR=$installdir/$pkgname install || exit 1
 
-#  if [[ $(basename $i) == "vishnew" || $(basename $i) == "diffusion" ]] && [[ $(hostname) =~ opensciencegrid.org|osgconnect.net ]]; then
+  #if [[ $(basename $i) == "vishnew" || $(basename $i) == "diffusion" ]] && [[ $(hostname) =~ opensciencegrid.org|osgconnect.net ]]; then
   if [[ $(hostname) =~ opensciencegrid.org|osconnect.net ]]; then
     load_osg
   fi
@@ -85,7 +110,7 @@ done
 mkdir $installdir/$pkgname/results/
 # cp models/processing_event $installdir/$pkgname/bmsap/
 # cp models/processing_event_updated $installdir/$pkgname/bmsap/
-cp models/run-events $installdir/$pkgname/
+cp models/run-events_cD.py $installdir/$pkgname/
 
 # create tgz for distributing to each job
 tar --verbose --create --gzip --file $pkgname.tar.gz \
