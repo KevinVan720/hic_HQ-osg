@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
-
 """
 run full space-time HQ evolution in heavy-ion collisions (seperated in several stages):
     -- initial condition (trento + HQ_sample)
     -- hydro (2+1D VishNew)
-    -- HQ transport (Langevin)
+    -- HQ transport (Lido -- linearized Botlzmann with diffusion model)
     -- HQ hardonization (fragmentation + recombination)
     -- light hadron particalization (osu-sampler)
     -- hadronic afterburner (UrQMD)
@@ -17,6 +16,8 @@ import numpy as np
 import h5py
 import shutil
 from scipy.interpolate import interp1d
+import fortranformat as ff
+import event
 
 def run_cmd(*args, **kwargs):
     print(*args, flush=True)
@@ -66,6 +67,7 @@ def run_initial(collision_sys, nevents):
          run_cmd('./trento Pb Pb ', str(nevents),
                 '--cross-section 7.0',
                 '--grid-max 13.05 --grid-step 0.1',
+                '--b-min 6.0 --b-max 7.0',
                 '--normalization 160 --fluctuation 1.6 --nucleon-width 0.51',
                 '--output initial', cwd='trento')
     elif collision_sys == 'PbPb2760':
@@ -86,75 +88,54 @@ def run_HQsample():
     run_cmd('./HQ_sample HQ_sample.conf', cwd='HQ_sample')
 
 
-def run_qhat(args):
-    run_cmd('./qhat_pQCD', str(args), cwd='qhat_pQCD')
-    args_list = args.split()
-    if args_list[0] == '--mass':
-        mass = float(args_list[1])
-    elif args_list[2] == '--mass':
-        mass = float(args_list[3])
 
-    if np.abs(mass - 1.3) < 0.2:
-        flavor = 'charm'
-    elif np.abs(mass - 4.2) < 0.2:
-        flavor = 'bottom'
+def run_Scattering():
+    with open('inputfile', 'r') as f:
+        config = dict( (i.strip() for i in l.split('=', maxsplit=1)) \
+                    for l in f if l[0] != '#')
 
+    # echo config:
+    print('#######################################')
+    for key, val in config.items():
+        print('{} = {}'.format(key, val))
+    print('#######################################')
 
-    gridE = 101
-    gridT = 31
-    qhat_Qq2Qq = h5py.File('qhat_pQCD/qhat_Qq2Qq.hdf5', 'r')['Qhat-tab']
-    qhat_Qg2Qg = h5py.File('qhat_pQCD/qhat_Qg2Qg.hdf5', 'r')['Qhat-tab']
-    rate_Qq2Qq = h5py.File('qhat_pQCD/rQq2Qq.hdf5', 'r')['Rates-tab']
-    rate_Qg2Qg = h5py.File('qhat_pQCD/rQg2Qg.hdf5', 'r')['Rates-tab']
+    p_types=['c', 'b']
+    N_charm = int(config.get('N_charm'))
+    N_bottom = int(config.get('N_bottom'))
+    Emax = float(config.get('Emax'))  # range of initial HQ rapidity
+    pTmin = float(config.get('pTmin'))
+    pTmax = float(config.get('pTmax'))
+    mu = float(config.get('mu'))
+    A = float(config.get('A'))
+    B = float(config.get('B'))
 
-    GeV_to_fmInv = 5.068
-    fmInv_to_GeV = 0.1973
+    # initialization 
+    init_config = { 'type': 'A+B',
+        'pTmin': pTmin, 'pTmax': pTmax, 'Emax': Emax,
+        'HQ_file': 'initial_HQ.dat'}
+    
+    e1 = event.event(medium={'type': 'dynamic', 'hydrofile': './JetData.h5'},
+        preeq = None,
+        LBT= {'mu':mu} , LGV = {'A': A, 'B': B}, Tc = 0.154)
 
-    E = np.linspace(mass*1.01, 140., gridE)
-    temp = np.linspace(0.15, 0.75, gridT)
+    e1.initialize_HQ (N_charm=N_charm, N_bottom=N_bottom, init_flags=init_config)
 
-    kperp = qhat_Qq2Qq[2,:,:] + qhat_Qg2Qg[2,:,:]
-    qhat_over_T3 = 2 * kperp / temp**3
+    # hydro stage
+    while e1.perform_hydro_step():
+        print('t = {:1.3f} [fm/c]'.format(e1.sys_time()) )
 
-    tempM, EM = np.meshgrid(temp, E)
-
-    res = []
-    for i in range(len(kperp)):
-        for j in range(len(kperp[i])):
-            dum = np.array([tempM[i,j], EM[i,j], qhat_over_T3[i,j]])
-            res.append(dum)
-
-    res = np.array(res)
-    np.savetxt('qhat_pQCD/gamma-table_{}.dat'.format(flavor), res, header = 'temp energy qhat_over_T3', fmt='%10.6f')
-
-
-
-
-def run_diffusion(args):
-    os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
-    os.environ['ftn20'] = 'HQ_AAcY.dat'
-    os.environ['ftn30'] = 'initial_HQ.dat'
-    run_cmd('./diffusion', str(args), cwd='diffusion')
+    for pid in p_types:
+        e1.output_oscar(4 if pid == 'c' else 5, './HQ_AA{}Y.dat'.format(pid))
 
 
 def run_fragPLUSrecomb():
     os.environ['ftn20'] = 'Dmeson_AAcY.dat'
     child1 = 'cat HQ_AAcY.dat'
-    p1 = subprocess.Popen(child1.split(), stdout = subprocess.PIPE)
-    p2 = subprocess.Popen('./fragPLUSrecomb', stdin = p1.stdout)
+    p1 = subprocess.Popen(child1.split(), stdout=subprocess.PIPE)
+    p2 = subprocess.Popen('./fragPLUSrecomb', stdin=p1.stdout)
     p1.stdout.close()
     output = p2.communicate()[0]
-
-def run_HMDecay():
-    ## run the oversampeld version of D -> e
-    for i in range(50):
-        os.environ['ftn20'] = 'HMelectron_AAcY.dat'
-        child1 = 'cat Dmeson_AAcY.dat'
-        p1 = subprocess.Popen(child1.split(), stdout = subprocess.PIPE)
-        p2 = subprocess.Popen('./HMDecay', stdin = p1.stdout)
-        p1.stdout.close()
-        output = p2.communicate()[0]
-        shutil.move('HMelectron_AAcY.dat', '../bmsap/HMelectron_AAcY{}.dat'.format(i))
 
 
 def participant_plane_angle():
@@ -414,102 +395,6 @@ def calculate_Dmeson_dNdpTdy(spectraFile, px_, py_, y_, initial_pT_):
     return (H, xbins, ybins)
 
 
-def calculate_beforeUrQMD_electron_single(spectraFile, ievent, DmesonFile, resultFile, grpName, ycut, status='w'):
-    ID, px, py, pz, p0, ipT = read_oscar_file(DmesonFile)
-    abs_ID = np.abs(ID)
-    y = 0.5 * np.log((p0 + pz)/(p0 - pz))
-    phi = np.arctan2(py, px)
-    fres = h5py.File(resultFile, status)
-
-    #------------ Dmeson midrapidity ------------------------
-    group_Dmeson = fres.create_group(grpName)
-    group_Dmeson.create_dataset('pID', data=np.unique(ID))
-
-    midrapidity = (np.fabs(y) < ycut)
-    ID_Dmeson = abs_ID[midrapidity]
-    px_Dmeson = px[midrapidity]
-    py_Dmeson = py[midrapidity]
-    phi_Dmeson = phi[midrapidity]
-    ipT_Dmeson = ipT[midrapidity]
-
-    Raa_result =calculate_Dmeson_Raa(spectraFile,ID_Dmeson,px_Dmeson, py_Dmeson, ipT_Dmeson)
-    group_Dmeson.create_dataset('multi_{}_y_lt_{}'.format(grpName, ycut), data = Raa_result) # for checking purpose
-
-    def write_rapidity(ycut):
-        if grpName == 'Bmeson':
-            midrapidity = (np.fabs(y) < ycut) & (Dmeson_ID)
-        else:
-            midrapidity = (np.fabs(y) < ycut)
-
-        ID_Dmeson = abs_ID[midrapidity]
-        px_Dmeson = px[midrapidity]
-        py_Dmeson = py[midrapidity]
-        phi_Dmeson = phi[midrapidity]
-        ipT_Dmeson = ipT[midrapidity]
-
-        v2_result =calculate_Dmeson_v2_EP(spectraFile, ID_Dmeson, px_Dmeson, py_Dmeson, ipT_Dmeson)
-        group_Dmeson.create_dataset('v2_{}_y_lt_{}_EP'.format(grpName, ycut), data = v2_result)
-
-    write_rapidity(0.5)
-    write_rapidity(0.6)
-    write_rapidity(0.7)
-    write_rapidity(0.8)
-    write_rapidity(1.0)
-    write_rapidity(2.4)
-
-    (Raa_result, bin1, bin2) = calculate_Dmeson_dNdpTdphi(spectraFile, px_Dmeson, py_Dmeson, phi_Dmeson, ipT_Dmeson)
-    group_Dmeson.create_dataset('multi_{}_dNdpTdphi_y_lt_{}'.format(grpName, ycut), data = Raa_result)
-    
-
-    # ----------- Dmeson dNdpTdy
-    (Raa_result, bin1, bin2) = calculate_Dmeson_dNdpTdy(spectraFile, px, py, y, ipT)
-    ds_multi = group_Dmeson.create_dataset('multi_{}_dNdpTdy'.format(grpName), data = Raa_result)
-    ds_multi.attrs.create('pT_min', bin1[0])
-    ds_multi.attrs.create('pT_max', bin1[-1])
-    ds_multi.attrs.create('dpT', bin1[1] - bin1[0])
-    ds_multi.attrs.create('y_min', bin2[0])
-    ds_multi.attrs.create('y_max', bin2[-1])
-    ds_multi.attrs.create('dy', bin2[1] - bin2[0])
- 
-    fres.close()
-
-def calculate_beforeUrQMD_electron_average(resultFile, e_resultFile):
-    fE = h5py.File(e_resultFile, 'r')
-    fres = h5py.File(resultFile, 'a')
-
-    e_dNdpTdy = []
-    e_dNdpTdphi = []
-    for j in range(50):
-        ds_electron = fE['electron%d'%j]
-        e_dNdpTdy.append(ds_electron['multi_electron%d_dNdpTdy'%j].value)
-        e_dNdpTdphi.append(ds_electron['multi_electron%d_dNdpTdphi_y_lt_0.7'%j].value)
-        
-    e_dNdpTdy = np.array(e_dNdpTdy).mean(axis=0)
-    e_dNdpTdphi = np.array(e_dNdpTdy).mean(axis=0)
-    group_Dmeson = fres.create_group('electron')
-    group_Dmeson.create_dataset('multi_electron_dNdpTdy', data=e_dNdpTdy)
-    group_Dmeson.create_dataset('multi_electron_dNdpTdphi_y_lt_0.7', data=e_dNdpTdphi)
-    
-
-    def append_rapidity(ycut):
-        e_v2 = []
-        e_weight = []
-        for j in range(50):
-            ds_electron = fE['electron%d'%j]
-            pT, _v2, _mD = ds_electron['v2_electron{}_y_lt_{}_EP'.format(j, ycut)].value.T
-            e_v2.append(_v2 * _mD)
-            e_weight.append(_mD)
-        e_v2 = np.array(e_v2).sum(axis=0) / np.array(e_weight).sum(axis=0)
-        result = np.array([pT, e_v2, np.array(e_weight).sum(axis=0)]).T
-        group_Dmeson.create_dataset('v2_electron_y_lt_{}_EP'.format(ycut), data = result)
-
-    append_rapidity(0.5)
-    append_rapidity(0.6)
-    append_rapidity(0.7)
-    append_rapidity(0.8)
-    append_rapidity(1.0)
-    append_rapidity(2.4)
-
 
 
 def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, ycut, status='w'):
@@ -553,14 +438,10 @@ def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, 
     ipT_Dmeson = ipT[midrapidity]
 
     Raa_result =calculate_Dmeson_Raa(spectraFile,ID_Dmeson,px_Dmeson, py_Dmeson, ipT_Dmeson)
-    group_Dmeson.create_dataset('multi_{}_y_lt_{}'.format(grpName, ycut), data = Raa_result) # for checking purpose
-
+    group_Dmeson.create_dataset('multi_{}_y_lt_{}'.format(grpName, ycut), data = Raa_result)  # for checking purpose
+    
     def write_rapidity(ycut):
-        if grpName == 'Bmeson':
-            midrapidity = (np.fabs(y) < ycut) & (Dmeson_ID)
-        else:
-            midrapidity = (np.fabs(y) < ycut)
-
+        midrapidity = (np.fabs(y) < ycut)
         ID_Dmeson = abs_ID[midrapidity]
         px_Dmeson = px[midrapidity]
         py_Dmeson = py[midrapidity]
@@ -570,12 +451,8 @@ def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, 
         v2_result =calculate_Dmeson_v2_EP(spectraFile, ID_Dmeson, px_Dmeson, py_Dmeson, ipT_Dmeson)
         group_Dmeson.create_dataset('v2_{}_y_lt_{}_EP'.format(grpName, ycut), data = v2_result)
 
-    write_rapidity(0.5)
-    write_rapidity(0.6)
-    write_rapidity(0.7)
-    write_rapidity(0.8)
-    write_rapidity(1.0)
-    write_rapidity(2.4)
+    for idum in [0.5, 0.6, 0.7, 0.8, 1.0, 2.4]:
+        write_rapidity(idum)
 
     (Raa_result, bin1, bin2) = calculate_Dmeson_dNdpTdphi(spectraFile, px_Dmeson, py_Dmeson, phi_Dmeson, ipT_Dmeson)
     group_Dmeson.create_dataset('multi_{}_dNdpTdphi_y_lt_{}'.format(grpName, ycut), data = Raa_result)
@@ -592,7 +469,6 @@ def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, 
     ds_multi.attrs.create('dy', bin2[1] - bin2[0])
  
     fres.close()
-
 
 
 def calculate_afterUrQMD(spectraFile, ievent, nsamples):
@@ -768,8 +644,6 @@ def main():
     print(config)
 
     run_initial(collision_sys, nevents)
-    run_qhat(config.get('qhat_args', ''))
-    shutil.copyfile('qhat_pQCD/gamma-table_charm.dat', 'diffusion/gamma-table_charm.dat')
 
     for ievent in range(nevents):
         postfix = '{}-{}.dat'.format(condor_ID, ievent)
@@ -784,68 +658,53 @@ def main():
 
         run_hydro()
         shutil.move('vishnew/surface.dat', 'sampler/surface.dat')
-        shutil.move('vishnew/JetData.h5', 'diffusion/JetData.h5')
+        shutil.move('vishnew/JetData.h5', './JetData.h5')
 
         run_HQsample()
-        shutil.move('HQ_sample/initial_HQ.dat', 'diffusion/initial_HQ.dat')
+        shutil.move('HQ_sample/initial_HQ.dat', './initial_HQ.dat')
 
-        run_diffusion(config.get('diffusion_args', ''))
-        shutil.move('diffusion/HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
+        run_Scattering()
+        shutil.move('HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
 
         os.chdir('fragPLUSrecomb/')
         run_fragPLUSrecomb()
         os.chdir('../')
-        shutil.move('fragPLUSrecomb/Dmeson_AAcY.dat', 'HMDecay/Dmeson_AAcY.dat')
-
-        os.chdir('HMDecay/')
-        run_HMDecay()
-        os.chdir('../')
-        shutil.move('HMDecay/Dmeson_AAcY.dat', 'bmsap/Dmeson_AAcY.dat')
+        shutil.move('fragPLUSrecomb/Dmeson_AAcY.dat', 'bmsap/Dmeson_AAcY.dat')
         shutil.move('fragPLUSrecomb/HQ_AAcY.dat', 'bmsap/HQ_AAcY.dat')
+
 
 
         os.chdir('bmsap/')
         participant_plane_angle()
         resultFile = 'result_beforeUrQMD.hdf5'
-        calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'Dmeson_AAcY.dat', resultFile, 'Dmeson', 0.8, 'w')
-        calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'HQ_AAcY.dat', resultFile, 'HQ', 0.8, 'a')
-        calculate_beforeUrQMD_electron_single('spectra/{}'.format(spectraFile), ievent, 'HMelectron_AAcY0.dat', 'result_electron.hdf5', 'electron0', 0.7, status='w')
-
-        for j in range(1,50):
-            calculate_beforeUrQMD_electron_single('spectra/{}'.format(spectraFile), ievent, 'HMelectron_AAcY{}.dat'.format(j), 'result_electron.hdf5', 'electron{}'.format(j), 0.7, status='a')
-
-
-        calculate_beforeUrQMD_electron_average(resultFile, 'result_electron.hdf5')
-
+        calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'Dmeson_AAcY.dat', resultFile, 'Dmeson', 1.0, 'w')
+        calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'HQ_AAcY.dat', resultFile, 'HQ', 1.0, 'a')
 
         os.chdir('../')
         shutil.copyfile('bmsap/Dmeson_AAcY.dat', 'urqmd-afterburner/Dmeson_AAcY.dat')
         shutil.copyfile('bmsap/pp_angle.dat', 'urqmd-afterburner/pp_angle.dat')
         shutil.copyfile('bmsap/initial.dat', 'urqmd-afterburner/initial.dat')
+        
+        shutil.move('bmsap/result_beforeUrQMD.hdf5', 'results/result_beforeUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
 
         nsamples = run_afterburner(ievent)
         if nsamples != 0:
-            if not os.path.isfile('urqmd-afterburner/LHC2760-AA2ccbar.dat'):
-                shutil.copyfile('bmsap/spectra/LHC2760-AA2ccbar.dat', 'urqmd-afterburner/LHC2760-AA2ccbar.dat')
-                shutil.copyfile('bmsap/spectra/LHC5020-AA2ccbar.dat', 'urqmd-afterburner/LHC5020-AA2ccbar.dat')
-                shutil.copyfile('bmsap/spectra/RHIC200-AA2ccbar.dat', 'urqmd-afterburner/RHIC200-AA2ccbar.dat')
+            if not os.path.isfile('urqmd-afterburner/{}'.format(spectraFile)):
+                shutil.copyfile('bmsap/spectra/{}'.format(spectraFile), 'urqmd-afterburner/{}'.format(spectraFile))
+        
             os.chdir('urqmd-afterburner/')
             calculate_afterUrQMD(spectraFile, ievent, nsamples)
 
-            # try to store the files 
+            # try to save the files
             shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('urqmd_input.dat', 'urqmd_input{}-{}.dat'.format(condor_ID, ievent))
-
             os.chdir('../')
             shutil.move('urqmd-afterburner/result_afterUrQMD.hdf5', 'results/result_afterUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
-            shutil.move('bmsap/result_beforeUrQMD.hdf5', 'results/result_beforeUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
 
         else:
-            print('No particle produced in this event!')
+            print('no particle produced in this event!')
             continue
-
-        
 
 
 if __name__ == '__main__':
