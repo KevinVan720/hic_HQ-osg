@@ -1,27 +1,27 @@
 [submodule "models/trento"]
 	path = models/trento
-	url = git@github.com:Yingru/trento.git
+	url = https://github.com:Yingru/trento.git
 [submodule "models/HQ_sample"]
 	path = models/HQ_sample
-	url = git@github.com:Yingru/HQ_sample.git
+	url = https://github.com:Yingru/HQ_sample.git
 [submodule "models/vishnew"]
 	path = models/vishnew
-	url = git@github.com:Yingru/vishnew.git
+	url = https://github.com:Yingru/vishnew.git
 [submodule "models/diffusion"]
 	path = models/diffusion
-	url = git@github.com:Yingru/diffusion.git
+	url = https://github.com:Yingru/diffusion.git
 [submodule "models/fragPLUSrecomb"]
 	path = models/fragPLUSrecomb
-	url = git@github.com:Yingru/fragPLUSrecomb.git
+	url = https://github.com:Yingru/fragPLUSrecomb.git
 [submodule "models/bmsap"]
 	path = models/bmsap
-	url = git@github.com:Yingru/bmsap.git
+	url = https://github.com:Yingru/bmsap.git
 [submodule "models/osu-sampler"]
 	path = models/osu-sampler
-	url = git@github.com:Yingru/osu-sampler.git
+	url = https://github.com:Yingru/osu-sampler.git
 [submodule "models/urqmd-afterburner"]
 	path = models/urqmd-afterburner
-	url = git@github.com:Yingru/urqmd-afterburner.git
+	url = https://github.com:Yingru/urqmd-afterburner.git
 [submodule "models/qhat_pQCD"]
 	path = models/qhat_pQCD
-	url = git@github.com:Yingru/qhat_pQCD.git
+	url = https://github.com:Yingru/qhat_pQCD.git
