@@ -25,6 +25,3 @@
 [submodule "models/qhat_pQCD"]
 	path = models/qhat_pQCD
 	url = git@github.com:Yingru/qhat_pQCD.git
-[submodule "models/HMDecay"]
-	path = models/HMDecay
-	url = git@github.com:Yingru/HMDecay.git
