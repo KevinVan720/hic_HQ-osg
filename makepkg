@@ -108,8 +108,6 @@ done
 
 # install the event runner script
 mkdir $installdir/$pkgname/results/
-# cp models/processing_event $installdir/$pkgname/bmsap/
-# cp models/processing_event_updated $installdir/$pkgname/bmsap/
 cp models/run-events_cD.py $installdir/$pkgname/
 
 # create tgz for distributing to each job

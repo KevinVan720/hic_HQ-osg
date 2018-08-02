@@ -1,3 +1,4 @@
+#!usr/bin/env python3
 """
 run full space-time HQ evolution in heavy-ion collisions (seperated in several stages):
     -- initial condition (trento + HQ_sample)
@@ -59,34 +60,34 @@ def run_initial(collision_sys, nevents):
                 '--cross-section 4.2',
                 '--grid-max 13.05 --grid-step 0.1',
                 '--normalization 60 --fluctuation 1.6 --nucleon-width 0.49',
-                '--output initial', cwd='trento')
+                '--output initial', cwd=None)
     elif collision_sys == 'PbPb5020':
          run_cmd('./trento Pb Pb ', str(nevents),
                 '--cross-section 7.0',
                 '--grid-max 13.05 --grid-step 0.1',
                 #'--b-min 6.0 --b-max 7.0',
                 '--normalization 160 --fluctuation 1.6 --nucleon-width 0.51',
-                '--output initial', cwd='trento')
+                '--output initial', cwd=None)
     elif collision_sys == 'PbPb2760':
-         run_cmd('./trento Pb Pb ', str(nevents),
+         run_cmd('./../bin/trento Pb Pb ', str(nevents),
                 '--cross-section 6.4',
                 '--grid-max 13.05 --grid-step 0.1',
                 '--normalization 131 --fluctuation 1.6 --nucleon-width 0.51',
-                '--output initial', cwd='trento')
+                '--output initial', cwd=None)
     else: 
         print(collision_sys, ' currently not implemented!')
 
 
 def run_hydro():
-    run_cmd('./vishnew etas=0.08 etas_slope=0.75 vishbulknorm=1.1 edec=0.24', cwd='vishnew')
+    run_cmd('./vishnew')
 
 
 def run_HQsample():
-    run_cmd('./HQ_sample HQ_sample.conf', cwd='HQ_sample')
+    run_cmd('./HQ_sample HQ_sample.conf')
 
 
 def run_qhat(args):
-    run_cmd('./qhat_pQCD', str(args), cwd='qhat_pQCD')
+    run_cmd('./qhat_pQCD', str(args))
     args_list = args.split()
     if args_list[0] == '--mass':
         mass = float(args_list[1])
@@ -101,10 +102,10 @@ def run_qhat(args):
 
     gridE = 101
     gridT = 31
-    qhat_Qq2Qq = h5py.File('qhat_pQCD/qhat_Qq2Qq.hdf5', 'r')['Qhat-tab']
-    qhat_Qg2Qg = h5py.File('qhat_pQCD/qhat_Qg2Qg.hdf5', 'r')['Qhat-tab']
-    rate_Qq2Qq = h5py.File('qhat_pQCD/rQq2Qq.hdf5', 'r')['Rates-tab']
-    rate_Qg2Qg = h5py.File('qhat_pQCD/rQg2Qg.hdf5', 'r')['Rates-tab']
+    qhat_Qq2Qq = h5py.File('qhat_Qq2Qq.hdf5', 'r')['Qhat-tab']
+    qhat_Qg2Qg = h5py.File('qhat_Qg2Qg.hdf5', 'r')['Qhat-tab']
+    rate_Qq2Qq = h5py.File('rQq2Qq.hdf5', 'r')['Rates-tab']
+    rate_Qg2Qg = h5py.File('rQg2Qg.hdf5', 'r')['Rates-tab']
 
     GeV_to_fmInv = 5.068
     fmInv_to_GeV = 0.1973
@@ -124,7 +125,7 @@ def run_qhat(args):
             res.append(dum)
 
     res = np.array(res)
-    np.savetxt('qhat_pQCD/gamma-table_{}.dat'.format(flavor), res, header = 'temp energy qhat_over_T3', fmt='%10.6f')
+    np.savetxt('gamma-table_{}.dat'.format(flavor), res, header = 'temp energy qhat_over_T3', fmt='%10.6f')
 
 
 
@@ -133,7 +134,7 @@ def run_diffusion(args):
     os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
     os.environ['ftn20'] = 'HQ_AAcY.dat'
     os.environ['ftn30'] = 'initial_HQ.dat'
-    run_cmd('./diffusion', str(args), cwd='diffusion')
+    run_cmd('./diffusion', str(args))
 
 def run_fragPLUSrecomb():
     os.environ['ftn20'] = 'Dmeson_AAcY.dat'
@@ -176,8 +177,8 @@ def run_afterburner(ievent):
     output: urqmd_inputFile (urqmd/urqmd_initial.dat)
     return: nsamples (number of oversampled urqmd events)
     """
-    surfaceFile = 'sampler/surface.dat'
-    eventinfo_File = 'sampler/{0}.info.dat'.format(ievent)
+    surfaceFile = 'surface.dat'
+    eventinfo_File = 'initial/{}.info.dat'.format(ievent)
 
     # now particalize the hypersurface
     if os.stat(surfaceFile).st_size == 0:
@@ -195,16 +196,16 @@ def run_afterburner(ievent):
     finfo.close()
 
     nsamples = min(max(int(2*1e5/initial_mult), 2), 100)
-    run_cmd('./sampler oversamples={}'.format(nsamples), cwd='sampler')
+    run_cmd('./sampler oversamples={}'.format(nsamples))
 
     # a non-empty hypersurface can still emit zero particles. If no particles is produced, the output 
     # will contain the three-line oscar header and nothing else. In this case, throw this event
-    with open('sampler/oscar.dat', 'rb') as f:
+    with open('oscar.dat', 'rb') as f:
         if next(itertools.islice(f, 3, None), None) is None:
             print('no particle emitted')
             return 0
 
-    run_cmd('./afterburner {} urqmd_final.dat'.format(nsamples), cwd='urqmd-afterburner')
+    run_cmd('./afterburner {} urqmd_final.dat'.format(nsamples))
     return nsamples
 
 def calculate_Dmeson_Raa(spectraFile, ID_, px_, py_, initial_pT_):
@@ -413,7 +414,7 @@ def calculate_beforeUrQMD(spectraFile, ievent, DmesonFile, resultFile, grpName, 
     #---------------- light hadron --------------------
     if 'light hadron' not in fres.keys():
         group_light = fres.create_group('light hadron')
-        infoFile = '../urqmd-afterburner/{}.info.dat'.format(ievent)
+        infoFile = 'initial/{}.info.dat'.format(ievent)
         i = 2
         with open(infoFile, 'r') as finfo:
             for line in finfo:
@@ -536,7 +537,7 @@ def calculate_afterUrQMD(spectraFile, ievent, nsamples):
 
     ##------------------ light hadron ---------------------------------
     group_light = fres.create_group('light hadron')
-    infoFile = '{}.info.dat'.format(ievent)
+    infoFile = 'initial/{}.info.dat'.format(ievent)
     i = 2
     with open(infoFile, 'r') as finfo:
         for line in finfo:
@@ -648,72 +649,50 @@ def main():
 
     ## for debug
     print(config)
+   
+    shutil.copy('parameters_df.dat', '../bin/')
+    shutil.copy('parameters_hd.dat', '../bin/')
+    shutil.copy('vishnew.conf', '../bin/')
+    shutil.copy('HQ_sample.conf', '../bin/')
 
+    os.chdir('../bin')
     run_initial(collision_sys, nevents)
+
     run_qhat(config.get('qhat_args', ''))
-    shutil.copyfile('qhat_pQCD/gamma-table_charm.dat', 'diffusion/gamma-table_charm.dat')
+    shutil.copy('gamma-table_charm.dat', '../results/gamma-table_charm.dat') 
 
     for ievent in range(nevents):
         postfix = '{}-{}.dat'.format(condor_ID, ievent)
-        initialFile = 'trento/initial/{}.dat'.format(ievent)
-        initial_info_File = 'trento/initial/{}.info.dat'.format(ievent)
+        initialFile = 'initial/{}.dat'.format(ievent)
+        initial_info_File = 'initial/{}.info.dat'.format(ievent)
+        shutil.copyfile(initialFile, 'initial.dat')
 
-        shutil.copyfile(initialFile, 'vishnew/initial.dat')
-        shutil.copyfile(initialFile, 'bmsap/initial.dat')
-        shutil.copyfile(initialFile, 'HQ_sample/initial.dat')
-        shutil.copyfile(initial_info_File, 'sampler/{}.info.dat'.format(ievent))
-        shutil.copyfile(initial_info_File, 'urqmd-afterburner/{}.info.dat'.format(ievent))
-
+        # run hydro
         run_hydro()
-        shutil.move('vishnew/surface.dat', 'sampler/surface.dat')
-        shutil.move('vishnew/JetData.h5', 'diffusion/JetData.h5')
-
         run_HQsample()
-        shutil.move('HQ_sample/initial_HQ.dat', 'diffusion/initial_HQ.dat')
 
         run_diffusion(config.get('diffusion_args', ''))
-        shutil.move('diffusion/HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
-
-        os.chdir('fragPLUSrecomb/')
         run_fragPLUSrecomb()
-        os.chdir('../')
-        shutil.move('fragPLUSrecomb/Dmeson_AAcY.dat', 'bmsap/Dmeson_AAcY.dat')
-        shutil.move('fragPLUSrecomb/HQ_AAcY.dat', 'bmsap/HQ_AAcY.dat')
 
-
-
-        os.chdir('bmsap/')
         participant_plane_angle()
         resultFile = 'result_beforeUrQMD.hdf5'
         calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'Dmeson_AAcY.dat', resultFile, 'Dmeson', 1.0, 'w')
         calculate_beforeUrQMD('spectra/{}'.format(spectraFile), ievent, 'HQ_AAcY.dat', resultFile, 'HQ', 1.0, 'a')
 
-        os.chdir('../')
-        shutil.copyfile('bmsap/Dmeson_AAcY.dat', 'urqmd-afterburner/Dmeson_AAcY.dat')
-        shutil.copyfile('bmsap/pp_angle.dat', 'urqmd-afterburner/pp_angle.dat')
-        shutil.copyfile('bmsap/initial.dat', 'urqmd-afterburner/initial.dat')
-        
-        shutil.move('bmsap/result_beforeUrQMD.hdf5', 'results/result_beforeUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
+        shutil.move('result_beforeUrQMD.hdf5', '../results/result_beforeUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
 
         nsamples = run_afterburner(ievent)
         if nsamples != 0:
-            if not os.path.isfile('urqmd-afterburner/{}'.format(spectraFile)):
-                shutil.copyfile('bmsap/spectra/{}'.format(spectraFile), 'urqmd-afterburner/{}'.format(spectraFile))
-        
-            os.chdir('urqmd-afterburner/')
-            calculate_afterUrQMD(spectraFile, ievent, nsamples)
+            calculate_afterUrQMD('spectra/{}'.format(spectraFile), ievent, nsamples)
 
             # try to save the files
             shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(condor_ID, ievent))
             shutil.move('urqmd_input.dat', 'urqmd_input{}-{}.dat'.format(condor_ID, ievent))
-            os.chdir('../')
-            shutil.move('urqmd-afterburner/result_afterUrQMD.hdf5', 'results/result_afterUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
-
+            shutil.move('result_afterUrQMD.hdf5', '../results/result_afterUrQMD{}-{}.hdf5'.format(condor_ID, ievent))
         else:
             print('no particle produced in this event!')
             continue
-
 
 if __name__ == '__main__':
     main()
