@@ -1,0 +1,49 @@
+#!/bin/sh
+
+# cannot use bash as the interpreter due to BASH_ENV nonsense
+if [[ $(basename $BASH) == 'bash' ]]; then
+  echo "do not run this script with bash"
+  echo "either execute it directly or use sh"
+  exit 1
+fi
+
+if [[ ! $NERSC_HOST ]]; then
+  echo "this script should be running on a NERSC machine"
+  exit 1
+fi
+
+
+# NERSC set BASH_ENV=~/.bashrc, and if PATH and CONDA_PREFIX are modified in 
+# .bashrx, it could deactivate a conda env. To workaround this, use sh as the 
+# interpreter, and unset interpreter before calling makepkg
+
+unset BASH_ENV
+
+# set GNU compiler for cmake to detect
+# set flags to compile on Cori (not working on Edison)
+# even though it is recommended to run in Cray-wrapper: cc, CC, ftn
+# cray-hdf5 library doesn't workout for ftn
+export CC=gcc CXX=g++ FC=gfortran
+export CFLAGS="-mtune=intel -ffast-math"
+
+export CXXFLAGS=$CFLAGS FFLAGS=$CFLAGS
+
+# for building python extentions
+export LDSHARED="$CC -shared"
+export PY_FLAGS="${CFLAGS/-static/-static-intel}"
+
+# flags for GNU compilers
+export GNU_FLAGS="-static -march=ivybridge -mtune=haswell -ffast-math"
+
+# Since we're running in sh due to the BASH_ENV nonsense above, it is apparently
+# sometimes necessary to explicitly source this to load the module command.
+source /opt/modules/default/etc/modules.sh
+
+# swap the compiling evn
+module swap PrgEnv-intel PrgEnv-gnu
+
+# load necessary modules
+module load gsl boost hdf5
+
+# install to the conda env
+./makepkg_install

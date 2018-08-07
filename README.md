@@ -14,7 +14,7 @@ Most of the workflow are inherited from J.Bernhard [heavy-ion collision simulati
 
 
 ## 2. To run locally
-> require dependencies: `C++11, python3, boost-1.54+ , gsl, cmake-2.8+, hdf5 (C++, fortran, python3)
+> require dependencies: `C++11, python3, boost-1.54+ , gsl, cmake-2.8+, hdf5 (C++, fortran, python3)`
 
 
 ## 3. To run in high throughout computing system [OSG](http://opensciencegrid.org/)

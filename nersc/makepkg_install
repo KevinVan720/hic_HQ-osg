@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# check that we're in a conda env or python virtualenv
+if [[ -d "$CONDA_PREFIX" && "$(which python)" -ef "$CONDA_PREFIX/bin/python" ]]; then
+  prefix="$CONDA_PREFIX"
+else
+  # In a virtualenv if file pyvenv.cfg exists one level above the python
+  # executable.  (This is better than checking the VIRTUAL_ENV variable, which
+  # may not be set.)
+  prefix="$(readlink -f "$(dirname "$(which python)")/..")"
+  if [[ ! -f "$prefix/pyvenv.cfg" ]]; then
+    echo 'must install in an active python virtualenv or conda env'
+    exit 1
+  fi
+fi
+
+
+# go to project root (directory above this script)
+# https://stackoverflow.com/a/246128
+cd "$(dirname "${BASH_SOURCE[0]}")"/..
+
+# build each model
+for i in models/*/; do
+  pushd $i
+
+  # determine whether to build with CMake for python
+  if [[ -f CMakeLists.txt ]]; then
+    # create build dictory and run cmake if necessary
+    if [[ -d build ]]; then
+      cd build
+    else
+      mkdir build && cd build
+      # disable install prefix by setting it to "/"
+      # the actual install location will be set to CONDA_PREFIX/bin
+      (
+        exec cmake \
+          -DCMAKE_BUILD_TYPE=Release \
+          -DCMAKE_INSTALL_PREFIX="/" \
+          ..
+      ) || exit 1
+    fi
+
+    # compile and install
+    make DESTDIR=$prefix install || exit 1
+  
+  elif [[ -f setup.py ]]; then
+    # install python packages
+    (
+      [[ $PY_FLAGS ]] && export CFLAGS=$PY_FLAGS CXXFLAGS=$PY_FLAGS
+      exec python setup.py install
+    ) || exit 1
+  else
+    echo "unknown build system for model $i"
+    exit 1
+  fi
+
+  popd
+done
+
+
+# install the event runner script and wrapper
+# install -v models/run-events_cD{,-wrapper} "$prefix/bin"
