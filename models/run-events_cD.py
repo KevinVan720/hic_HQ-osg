@@ -1,8 +1,9 @@
+#!/usr/bin/env python3
 """
 run full space-time HQ evolution in heavy-ion collisions (seperated in several stages):
     -- initial condition (trento + HQ_sample)
     -- hydro (2+1D VishNew)
-    -- HQ transport (Langevin)
+    -- HQ transport (Lido -- linearized Botlzmann with diffusion model)
     -- HQ hardonization (fragmentation + recombination)
     -- light hadron particalization (osu-sampler)
     -- hadronic afterburner (UrQMD)
@@ -15,6 +16,8 @@ import numpy as np
 import h5py
 import shutil
 from scipy.interpolate import interp1d
+import fortranformat as ff
+import event
 
 def run_cmd(*args, **kwargs):
     print(*args, flush=True)
@@ -85,55 +88,46 @@ def run_HQsample():
     run_cmd('./HQ_sample HQ_sample.conf', cwd='HQ_sample')
 
 
-def run_qhat(args):
-    run_cmd('./qhat_pQCD', str(args), cwd='qhat_pQCD')
-    args_list = args.split()
-    if args_list[0] == '--mass':
-        mass = float(args_list[1])
-    elif args_list[2] == '--mass':
-        mass = float(args_list[3])
 
-    if np.abs(mass - 1.3) < 0.2:
-        flavor = 'charm'
-    elif np.abs(mass - 4.2) < 0.2:
-        flavor = 'bottom'
+def run_Scattering():
+    with open('inputfile', 'r') as f:
+        config = dict( (i.strip() for i in l.split('=', maxsplit=1)) \
+                    for l in f if l[0] != '#')
 
+    # echo config:
+    print('#######################################')
+    for key, val in config.items():
+        print('{} = {}'.format(key, val))
+    print('#######################################')
 
-    gridE = 101
-    gridT = 31
-    qhat_Qq2Qq = h5py.File('qhat_pQCD/qhat_Qq2Qq.hdf5', 'r')['Qhat-tab']
-    qhat_Qg2Qg = h5py.File('qhat_pQCD/qhat_Qg2Qg.hdf5', 'r')['Qhat-tab']
-    rate_Qq2Qq = h5py.File('qhat_pQCD/rQq2Qq.hdf5', 'r')['Rates-tab']
-    rate_Qg2Qg = h5py.File('qhat_pQCD/rQg2Qg.hdf5', 'r')['Rates-tab']
+    p_types=['c', 'b']
+    N_charm = int(config.get('N_charm'))
+    N_bottom = int(config.get('N_bottom'))
+    Emax = float(config.get('Emax'))  # range of initial HQ rapidity
+    pTmin = float(config.get('pTmin'))
+    pTmax = float(config.get('pTmax'))
+    mu = float(config.get('mu'))
+    A = float(config.get('A'))
+    B = float(config.get('B'))
 
-    GeV_to_fmInv = 5.068
-    fmInv_to_GeV = 0.1973
+    # initialization 
+    init_config = { 'type': 'A+B',
+        'pTmin': pTmin, 'pTmax': pTmax, 'Emax': Emax,
+        'HQ_file': 'initial_HQ.dat'}
+    
+    e1 = event.event(medium={'type': 'dynamic', 'hydrofile': './JetData.h5'},
+        preeq = None,
+        LBT= {'mu':mu} , LGV = {'A': A, 'B': B}, Tc = 0.154)
 
-    E = np.linspace(mass*1.01, 140., gridE)
-    temp = np.linspace(0.15, 0.75, gridT)
+    e1.initialize_HQ (N_charm=N_charm, N_bottom=N_bottom, init_flags=init_config)
 
-    kperp = qhat_Qq2Qq[2,:,:] + qhat_Qg2Qg[2,:,:]
-    qhat_over_T3 = 2 * kperp / temp**3
+    # hydro stage
+    while e1.perform_hydro_step():
+        print('t = {:1.3f} [fm/c]'.format(e1.sys_time()) )
 
-    tempM, EM = np.meshgrid(temp, E)
+    for pid in p_types:
+        e1.output_oscar(4 if pid == 'c' else 5, './HQ_AA{}Y.dat'.format(pid))
 
-    res = []
-    for i in range(len(kperp)):
-        for j in range(len(kperp[i])):
-            dum = np.array([tempM[i,j], EM[i,j], qhat_over_T3[i,j]])
-            res.append(dum)
-
-    res = np.array(res)
-    np.savetxt('qhat_pQCD/gamma-table_{}.dat'.format(flavor), res, header = 'temp energy qhat_over_T3', fmt='%10.6f')
-
-
-
-
-def run_diffusion(args):
-    os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
-    os.environ['ftn20'] = 'HQ_AAcY.dat'
-    os.environ['ftn30'] = 'initial_HQ.dat'
-    run_cmd('./diffusion', str(args), cwd='diffusion')
 
 def run_fragPLUSrecomb():
     os.environ['ftn20'] = 'Dmeson_AAcY.dat'
@@ -650,8 +644,6 @@ def main():
     print(config)
 
     run_initial(collision_sys, nevents)
-    run_qhat(config.get('qhat_args', ''))
-    shutil.copyfile('qhat_pQCD/gamma-table_charm.dat', 'diffusion/gamma-table_charm.dat')
 
     for ievent in range(nevents):
         postfix = '{}-{}.dat'.format(condor_ID, ievent)
@@ -666,13 +658,13 @@ def main():
 
         run_hydro()
         shutil.move('vishnew/surface.dat', 'sampler/surface.dat')
-        shutil.move('vishnew/JetData.h5', 'diffusion/JetData.h5')
+        shutil.move('vishnew/JetData.h5', './JetData.h5')
 
         run_HQsample()
-        shutil.move('HQ_sample/initial_HQ.dat', 'diffusion/initial_HQ.dat')
+        shutil.move('HQ_sample/initial_HQ.dat', './initial_HQ.dat')
 
-        run_diffusion(config.get('diffusion_args', ''))
-        shutil.move('diffusion/HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
+        run_Scattering()
+        shutil.move('HQ_AAcY.dat', 'fragPLUSrecomb/HQ_AAcY.dat')
 
         os.chdir('fragPLUSrecomb/')
         run_fragPLUSrecomb()

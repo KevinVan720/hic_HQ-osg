@@ -25,3 +25,12 @@
 [submodule "models/qhat_pQCD"]
 	path = models/qhat_pQCD
 	url = https://github.com/Yingru/qhat_pQCD.git
+[submodule "Duke-Lido"]
+	path = Duke-Lido
+	url = git@github.com:Yingru/Duke-Lido.git
+[submodule "models/Scattering"]
+	path = models/Scattering
+	url = git@github.com:Yingru/Duke-Lido.git
+[submodule "models/fortranformat"]
+	path = models/fortranformat
+	url = https://github.com/keweiyao/fortranformat.git

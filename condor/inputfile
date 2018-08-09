@@ -1,0 +1,15 @@
+nevents = 10
+sqrts = 5020
+trento_args = -x 7.0 -n 18.4 -p 0.0 -k 1.2 -w 0.9 --ncoll
+tau_fs = 1.2
+xi_fs= 0.5
+hydro-args= stop=0.154 min=0.08 slope=1.1 curvature=-0.5 zetas_max=0.05 zetas_width=0.02 zetas_t0=0.180 iskip_t=4 iskip_xy=2
+Tswitch = 0.154
+N_charm = 60000
+N_bottom = 1
+Emax = 200.
+pTmin = .5
+pTmax = 140.5
+mu = .6
+A = 0.4
+B = 0.5
