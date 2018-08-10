@@ -1,4 +1,4 @@
-#!usr/bin/env python3
+#!/usr/bin/env python3
 """
 run full space-time HQ evolution in heavy-ion collisions (seperated in several stages):
     -- initial condition (trento + HQ_sample)
@@ -649,13 +649,13 @@ def main():
 
     ## for debug
     print(config)
-   
-    shutil.copy('parameters_df.dat', '../bin/')
-    shutil.copy('parameters_hd.dat', '../bin/')
-    shutil.copy('vishnew.conf', '../bin/')
-    shutil.copy('HQ_sample.conf', '../bin/')
+    for parFile in ['parameters_df.dat', 'parameters_hd.dat', 'vishnew.conf', 'HQ_sample.conf']:
+        if os.path.isfile(parFile):
+            shutil.copy(parFile, 'bin')
+        else:
+            print('No usr defined ', parFile)
 
-    os.chdir('../bin')
+    os.chdir('bin')
     run_initial(collision_sys, nevents)
 
     run_qhat(config.get('qhat_args', ''))

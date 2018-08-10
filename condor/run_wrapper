@@ -25,8 +25,7 @@ export XDG_DATA_HOME="$(pwd)/share"
 export PYTHONPATH="$(echo $(pwd)/lib/python*/site-packages)"
 
 cp ../args.conf .
-cp ../inputfile .
-ldd fragPLUSrecomb/fragPLUSrecomb
+ldd bin/fragPLUSrecomb
 
 ./run-events_cD.py args.conf $1
 
