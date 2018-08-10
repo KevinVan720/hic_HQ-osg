@@ -66,7 +66,6 @@ def run_initial(collision_sys, nevents):
          run_cmd('./trento Pb Pb ', str(nevents),
                 '--cross-section 7.0',
                 '--grid-max 13.05 --grid-step 0.1',
-                '--b-min 13.0 --b-max 14.0',
                 '--normalization 160 --fluctuation 1.6 --nucleon-width 0.51',
                 '--output initial', cwd='trento')
     elif collision_sys == 'PbPb2760':
@@ -644,8 +643,8 @@ def main():
     print(config)
 
     run_initial(collision_sys, nevents)
-    #run_qhat(config.get('qhat_args', ''))
-    #shutil.copyfile('qhat_pQCD/gamma-table_charm.dat', 'diffusion/gamma-table_charm.dat')
+    run_qhat(config.get('qhat_args', ''))
+    shutil.copyfile('qhat_pQCD/gamma-table_charm.dat', 'diffusion/gamma-table_charm.dat')
 
     for ievent in range(nevents):
         postfix = '{}-{}.dat'.format(condor_ID, ievent)

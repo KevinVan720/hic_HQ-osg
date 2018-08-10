@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 run full space-time HQ evolution in heavy-ion collisions (seperated in several stages):
     -- initial condition (trento + HQ_sample)
