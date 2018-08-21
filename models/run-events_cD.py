@@ -18,7 +18,7 @@ import h5py
 import shutil
 from scipy.interpolate import interp1d
 
-sys.path.insert(1, 'lib/python3.6/site-packages')
+sys.path.insert(1, 'lib/python3.5/site-packages')
 import freestream
 import frzout
 
@@ -706,6 +706,9 @@ def main():
         config.get('trento_args', '')
     )
 
+    run_qhat(config.get('qhat_args'))
+
+
     # set up sampler HRG object 
     Tswitch = float(config.get('Tswitch'))
     hrg = frzout.HRG(Tswitch, species = 'urqmd', res_width=True)
@@ -807,14 +810,12 @@ def main():
 
         run_cmd('./HQ_sample HQ_sample.conf')
 
-        #run_qhat(config.get('qhat_args'))
-
         # ================ HQ evolution (pre-equilibirum stages) =================
         os.environ['ftn00'] = 'FreeStream.h5'
         os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
         os.environ['ftn20'] = 'HQ_AAcY_preQ.dat'
         os.environ['ftn30'] = 'initial_HQ.dat'
-        run_cmd('./diffusion hq_input=3.0 ',
+        run_cmd('./diffusion hq_input=3.0 initt={}'.format(tau_fs*xi_fs),
                 config.get('diffusion_args', '')
         )
 
@@ -823,7 +824,7 @@ def main():
         os.environ['ftn10'] = 'dNg_over_dt_cD6.dat'
         os.environ['ftn20'] = 'HQ_AAcY.dat'
         os.environ['ftn30'] = 'HQ_AAcY_preQ.dat'
-        run_cmd('./diffusion hq_input=4.0 ',
+        run_cmd('./diffusion hq_input=4.0 initt={}'.format(tau_fs),
                 config.get('diffusion_args', '')
         )
 
