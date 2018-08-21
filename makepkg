@@ -83,6 +83,7 @@ for i in models/*/; do
     make --jobs=$(nproc) DESTDIR=$pkgdir install || exit 1
   elif [[ -f setup.py ]]; then
     # install python packages
+    # source activate py35
     python3 setup.py install \
       --no-compile \
       --root=$pkgdir \
@@ -91,6 +92,7 @@ for i in models/*/; do
 
     # let python find packages in the temperary directory -- this is necessrary for frzout
     export PYTHONPATH=$PYTHONPATH:"$(echo $pkgdir/lib*/python*/site-packages)"
+    # source deactivate 
   else
     echo "unknown build system for model "
     exit 1
