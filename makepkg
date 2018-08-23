@@ -110,7 +110,7 @@ done
 
 # install the event runner script
 mkdir $installdir/$pkgname/results/
-cp models/run-events_cD.py $installdir/$pkgname/
+cp models/run-events_cD.py $installdir/$pkgname/results
 
 # create tgz for distributing to each job
 tar --verbose --create --gzip --file $pkgname.tar.gz \
