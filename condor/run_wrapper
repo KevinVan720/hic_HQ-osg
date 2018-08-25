@@ -21,15 +21,16 @@ module load hdf5/1.8.20-cxx11
 module list
 
 
-export XDG_DATA_HOME="$(pwd)/share"
-export PYTHONPATH="$(echo $(pwd)/lib/python*/site-packages)"
-
-cp ../args.conf .
+export PATH="$PWD/bin/:$PATH"
+export PYTHONPATH="$PWD/lib/python3.5/site-packages:$PYTHONPATH"
+export XDG_DATA_HOME="$PWD/share"
 ldd bin/fragPLUSrecomb
 
-./run-events_cD.py args.conf $1
+cp ../args.conf results/
+cd results/
+python3 run-events_cD.py args.conf $1
 
-cd ../    
+cd ../../
 tar czf results$1.tar.gz hic_HQ-osg/results    
 
 transferFile=results$1.tar.gz

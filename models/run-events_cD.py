@@ -699,7 +699,6 @@ def main():
     proj = collision_sys[:2]
     targ = collision_sys[2:4]
         
-    '''
     run_cmd(
         'trento {} {}'.format(proj, targ), str(nevents),
         '--grid-step {} --grid-max {}'.format(grid_step, grid_max),
@@ -708,7 +707,6 @@ def main():
     )
 
     run_qhat(config.get('qhat_args'))
-    '''
     # set up sampler HRG object 
     Tswitch = float(config.get('Tswitch'))
     hrg = frzout.HRG(Tswitch, species = 'urqmd', res_width=True)
@@ -848,13 +846,14 @@ def main():
         if nsamples != 0:
             calculate_afterUrQMD(spectraFile, 'urqmd_final.dat', resultFile, 'afterUrQMD/Dmeson', 1.0, 'a')
         
-        shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(jobID, ievent))
-        shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(jobID, ievent))
-        shutil.move('HQ_AAcY.dat', 'HQ_AAcY{}-{}.dat'.format(jobID, ievent))
-        shutil.move('HQ_AAcY_preQ.dat', 'HQ_AAcY_preQ{}-{}.dat'.format(jobID, ievent))
+        #shutil.move('urqmd_final.dat', 'urqmd_final{}-{}.dat'.format(jobID, ievent))
+        #shutil.move('Dmeson_AAcY.dat', 'Dmeson_AAcY{}-{}.dat'.format(jobID, ievent))
+        #shutil.move('HQ_AAcY.dat', 'HQ_AAcY{}-{}.dat'.format(jobID, ievent))
+        #shutil.move('HQ_AAcY_preQ.dat', 'HQ_AAcY_preQ{}-{}.dat'.format(jobID, ievent))
     
     #=== after everything, save initial profile (depends on how large the size if, I may choose to forward this step)
     shutil.move('initial.hdf5', 'initial_{}.hdf5'.format(jobID))
+    shutil.move('gamma-table_charm.dat', 'gamma-table_charm{}.dat'.format(config.get('qhat_args').split()[-1]))
 
 if __name__ == '__main__':
     main()
