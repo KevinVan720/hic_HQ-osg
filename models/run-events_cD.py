@@ -736,7 +736,9 @@ def main():
         e.tofile('ed.dat')
 
         # calculate the participant plane angle
-        participant_plane_angle(e, int(grid_max))
+        pp_angle = participant_plane_angle(e, int(grid_max))
+        event_gp.attrs.create('pp_angle', pp_angle)
+
 
         for i in [1, 2]:
             fs.flow_velocity(i).tofile('u{}.dat'.format(i))
