@@ -362,7 +362,7 @@ def calculate_Dmeson_v2_EP(spectraFile, ID_, px_, py_, initial_pT_):
         angle = 0
         print('pp_angle.dat not found.')
 
-    final_v2 = ((py_**2 - px_**2) * np.cos(2*angle) + 2 * px_*py_*np.sin(2*angle)) / (final_pT**2)
+    final_v2 = ((px_**2 - py_**2) * np.cos(2*angle) + 2 * px_*py_*np.sin(2*angle)) / (final_pT**2)
     final_v2_with_weight = final_v2 * pT_weight
 
     v2_result = []
