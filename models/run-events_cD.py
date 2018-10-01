@@ -728,7 +728,7 @@ def main():
 
         # =============== Freestreaming =========================================== 
         save_fs_history(ic[0], event_size=grid_max, grid_step=grid_step,
-                        tau_fs=tau_fs, xi=xi_fs, steps=5, grid_max=grid_max, coarse=2)
+                        tau_fs=tau_fs, xi=xi_fs, steps=10, grid_max=grid_max, coarse=2)
         fs = freestream.FreeStreamer(ic[0], grid_max, tau_fs)
         e = fs.energy_density()
         e_above = e[e> eswitch].sum()
