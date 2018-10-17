@@ -31,3 +31,6 @@
 [submodule "models/frzout"]
 	path = models/frzout
 	url = https://github.com/Duke-QCD/frzout.git
+[submodule "models/Scattering"]
+	path = models/Scattering
+	url = https://github.com/Yingru/Duke-Lido.git
