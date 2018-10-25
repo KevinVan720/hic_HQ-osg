@@ -21,6 +21,8 @@ from scipy.interpolate import interp1d
 #sys.path.insert(1, 'lib/python3.5/site-packages')
 import freestream
 import frzout
+import fortranformat as ff
+import event
 
 share=os.environ.get('XDG_DATA_HOME')
 
@@ -199,6 +201,44 @@ def run_qhat(args):
     res = np.array(res)
     np.savetxt('gamma-table_{}.dat'.format(flavor), res, header = 'temp energy qhat_over_T3', fmt='%10.6f')
 
+
+def run_Scattering(config):
+    pids = ['c', 'b']
+    Ncharm = int(config.get('N_charm', 60000))
+    Nbottom = int(config.get('N_bottom', 4))
+    Emax = float(config.get('Emax', 150))
+    pTmin = float(config.get('pTmin'))
+    pTmax = float(config.get('pTmax'))
+
+    mu = float(config.get('mu'))
+    A = float(config.get('A', 0))
+    B = float(config.get('B', 0))
+
+    # initialization configuration
+    init_config = {
+        'type': 'A+B',
+        'pTmin': pTmin, 'pTmax': pTmax, 'Emax': Emax,
+        'HQ_file': 'initial_HQ.dat'   ## comment!!!! need to improve this, right now it is inconsistent!
+    }
+
+    e1 = event.event(medium = {'type': 'dynamic', 'hydrofile': './JetData.h5'},
+            preeq = {'type': 'dynamic', 'hydrofile': './FreeStream.h5'},
+            LBT= {'mu': mu},
+            LGV = {'A': A, 'B': B},
+            Tc =  0.154)
+    
+    e1.initialize_HQ(N_charm = Ncharm, N_bottom=Nbottom, init_flags = init_config)
+
+    # preeq stage
+    while e1.preform_fs_step():
+        print('t = {:1.3f} [fm/c]'.format(e1.sys_time()))
+
+    # hydro stage
+    while e1.perform_hydro_step():
+        print('t = {:1.3f} [fm/c]'.format(e1.sys_time()))
+        
+    for id in pids:
+        e1.output_oscar(4 if id=='c' else 5, './HQ_AA{}Y.dat'.format(id))
 
 
 
@@ -695,6 +735,25 @@ def main():
     xi_fs = float(config.get('xi_fs'))
     nevents = int(config.get('nevents'))
 
+
+    # ======= HQ initialization parameters ============================
+    HQ_pids = ['c', 'b']
+    Ncharm = int(config.get('N_charm', 60000))
+    Nbottom = int(config.get('N_bottom', 4))
+    pTmin = float(config.get('pTmin', 0.5))
+    pTmax = float(config.get('pTmax', 150.))
+    Emax = float(config.get('Emax', 200.))
+
+    mu = float(config.get('mu', 0.6))
+    A = float(config.get('A', 0))
+    B = float(config.get('B', 0))
+
+    init_config = {
+        'type': 'A+B',
+        'pTmin': pTmin, 'pTmax': pTmax, 'Emax': Emax,
+        'HQ_file': 'initial_HQ.dat'
+    }
+
     # ========== initial condition ============================================
     proj = collision_sys[:2]
     targ = collision_sys[2:4]
@@ -706,7 +765,6 @@ def main():
         config.get('trento_args', '')
     )
 
-    run_qhat(config.get('qhat_args'))
     # set up sampler HRG object 
     Tswitch = float(config.get('Tswitch'))
     hrg = frzout.HRG(Tswitch, species = 'urqmd', res_width=True)
@@ -810,26 +868,49 @@ def main():
 
         run_cmd('HQ_sample HQ_sample.conf')
 
-        # ================ HQ evolution (pre-equilibirum stages) =================
-        os.environ['ftn00'] = 'FreeStream.h5'
-        os.environ['ftn10'] = '%s/dNg_over_dt_cD6.dat'%share
-        print(os.environ['ftn10'])
-        os.environ['ftn20'] = 'HQ_AAcY_preQ.dat'
-        os.environ['ftn30'] = 'initial_HQ.dat'
-        run_cmd('diffusion hq_input=3.0 initt={}'.format(tau_fs*xi_fs),
-                config.get('diffusion_args', '')
-        )
+        
+        # ================ HQ evolution in the Lido framework ===================
+        e1 = event.event(medium = {'type': 'dynamic', 'hydrofile': './JetData.h5'},
+                preeq = {'type': 'dynamic', 'hydrofile': './FreeStream.h5'},
+                LBT = {'mu': mu},
+                LGV = {'A': A, 'B': B},
+                Tc = 0.154)
 
-        # ================ HQ evolution (in medium evolution) ====================
-        os.environ['ftn00'] = 'JetData.h5'
-        os.environ['ftn10'] = '%s/dNg_over_dt_cD6.dat'%share
-        os.environ['ftn20'] = 'HQ_AAcY.dat'
-        os.environ['ftn30'] = 'HQ_AAcY_preQ.dat'
-        run_cmd('diffusion hq_input=4.0 initt={}'.format(tau_fs),
-                config.get('diffusion_args', '')
-        )
+        e1.initialize_HQ(N_charm=Ncharm, N_bottom=Nbottom, init_flags = init_config)
 
-    
+
+        # for debugging purpose
+        #fHQ_hist = h5py.File('HQ_evolution_{}.h5'.format(ievent), 'a')
+        #HQ_steps = 0
+        ###  pre-equilibirum stages
+        while e1.perform_fs_step():
+            print('t = {:1.3f} [fm/c]'.format(e1.sys_time()))
+            #p_, x_ = e1.HQ_hist(4)
+            #grp = fHQ_hist.create_group('time{}'.format(HQ_steps))
+            #grp.create_dataset('p', data=p_)
+            #grp.create_dataset('x', data=x_)
+            #grp.attrs.create('time', e1.sys_time(), dtype=np.float)
+            #HQ_steps += 1
+
+        ### hydro stages
+        while e1.perform_hydro_step():
+            print('t = {:1.3f} [fm/s]'.format(e1.sys_time()))
+            #p_, x_ = e1.HQ_hist(4)
+            #grp = fHQ_hist.create_group('time{}'.format(HQ_steps))
+            #grp.create_dataset('p', data=p_)
+            #grp.create_dataset('x', data=x_)
+            #grp.attrs.create('time', e1.sys_time(), dtype=np.float)
+            #HQ_steps += 1
+        
+        for id in HQ_pids:
+            e1.output_oscar(4 if id=='c' else 5, './HQ_AA{}Y_preQ.dat'.format(id))
+
+        for id in HQ_pids:
+            e1.output_oscar(4 if id=='c' else 5, './HQ_AA{}Y.dat'.format(id))
+
+        e1.clean_medium()
+        #fHQ_hist.close()
+
         # ============== Heavy quark hardonization ==============================
         os.environ['ftn20'] = 'Dmeson_AAcY.dat'
         child1 = 'cat HQ_AAcY.dat'
@@ -855,7 +936,6 @@ def main():
     
     #=== after everything, save initial profile (depends on how large the size if, I may choose to forward this step)
     shutil.move('initial.hdf5', 'initial_{}.hdf5'.format(jobID))
-    shutil.move('gamma-table_charm.dat', 'gamma-table_charm{}.dat'.format(config.get('qhat_args').split()[-1]))
 
 if __name__ == '__main__':
     main()
