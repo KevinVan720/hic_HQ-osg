@@ -157,6 +157,37 @@ def run_hydro(tau_fs, dtau, grid_step, Nhalf, config):
 def run_HQsample():
     run_cmd('HQ_sample HQ_sample.conf')
 
+def run_qhat_scattering(args):
+    run_cmd('Scattering', str(args))
+
+    with h5py.File('table.h5', 'r') as f:
+        processes = ['cq2cq', 'cg2cg']
+
+        a = f['Boltzmann/{}/rate/scalar'.format(processes[0])].attrs
+        E = np.linspace(a['low-0'], a['high-0'], a['shape-0'])
+        T = np.linspace(a['low-1'], a['high-1'], a['shape-1'])
+
+        kpara = np.zeros([len(E), len(T)])
+        kperp = np.zeros([len(E), len(T)])
+        rates = np.zeros([len(E), len(T)])
+
+        for process in processes:
+            dNdt = f['Boltzmann/{}/rate/scalar/0'.format(process)].value
+            dpzdt = f['Boltzmann/{}/rate/vector/3'.format(process)].value
+            dpx2dt = f['Boltzmann/{}/rate/tensor/5'.format(process)].value
+            dpz2dt = f['Boltzmann/{}/rate/tensor/15'.format(process)].value
+
+            kpara += dpz2dt - dpzdt**2/dNdt
+            kperp += dpx2dt
+            rates += dNdt
+
+        qhatOverT3 = 2*kperp/T**3
+        tempM, EM = np.meshgrid(T, E)
+
+        np.savetxt('gamma-table_charm.dat', np.array([tempM.flatten(), EM.flatten(), qhatOverT3.flatten()]).T, fmt='%10.6f', header='temp   energy  qhat_over_T3')
+
+
+
 
 def run_qhat(args):
     run_cmd('qhat_pQCD', str(args))
@@ -706,7 +737,10 @@ def main():
         config.get('trento_args', '')
     )
 
-    run_qhat(config.get('qhat_args'))
+    # ========== qhat config file ============================
+    mu = float(config.get('mu'))
+    run_qhat_scattering('--mu {} --mode new'.format(mu))
+
     # set up sampler HRG object 
     Tswitch = float(config.get('Tswitch'))
     hrg = frzout.HRG(Tswitch, species = 'urqmd', res_width=True)
