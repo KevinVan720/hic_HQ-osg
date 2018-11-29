@@ -170,6 +170,7 @@ def run_qhat_scattering(args):
         kpara = np.zeros([len(E), len(T)])
         kperp = np.zeros([len(E), len(T)])
         rates = np.zeros([len(E), len(T)])
+        drag = np.zeros([len(E), len(T)])
 
         for process in processes:
             dNdt = f['Boltzmann/{}/rate/scalar/0'.format(process)].value
@@ -177,14 +178,19 @@ def run_qhat_scattering(args):
             dpx2dt = f['Boltzmann/{}/rate/tensor/5'.format(process)].value
             dpz2dt = f['Boltzmann/{}/rate/tensor/15'.format(process)].value
 
+            drag += dpzdt
             kpara += dpz2dt - dpzdt**2/dNdt
             kperp += dpx2dt
             rates += dNdt
 
         qhatOverT3 = 2*kperp/T**3
         tempM, EM = np.meshgrid(T, E)
+        #result = [tempM.flatten(), EM.flatten(), qhatOverT3.flatten()]
+        #np.savetxt('gamma-table_charm.dat', np.array(result).T fmt='%10.6f', header='temp  energy  qhat_over_T3') 
 
-        np.savetxt('gamma-table_charm.dat', np.array([tempM.flatten(), EM.flatten(), qhatOverT3.flatten()]).T, fmt='%10.6f', header='temp   energy  qhat_over_T3')
+        result=[tempM.flatten(), EM.flatten(), -drag.flatten(), kpara.flatten(), kperp.flatten()]
+        np.savetxt('gamma-table_charm.dat', np.array(result).T, fmt='%10.6f', header='temp  energy  drag  kappaL  kappaT')
+        
 
 
 
@@ -850,7 +856,7 @@ def main():
         print(os.environ['ftn10'])
         os.environ['ftn20'] = 'HQ_AAcY_preQ.dat'
         os.environ['ftn30'] = 'initial_HQ.dat'
-        run_cmd('diffusion hq_input=3.0 initt={}'.format(tau_fs*xi_fs),
+        run_cmd('diffusion hq_input=3.0 initt={} alphaMU={}'.format(tau_fs*xi_fs, mu),
                 config.get('diffusion_args', '')
         )
 
@@ -859,7 +865,7 @@ def main():
         os.environ['ftn10'] = '%s/dNg_over_dt_cD6.dat'%share
         os.environ['ftn20'] = 'HQ_AAcY.dat'
         os.environ['ftn30'] = 'HQ_AAcY_preQ.dat'
-        run_cmd('diffusion hq_input=4.0 initt={}'.format(tau_fs),
+        run_cmd('diffusion hq_input=4.0 initt={} alphaMU={}'.format(tau_fs, mu),
                 config.get('diffusion_args', '')
         )
 
@@ -889,7 +895,7 @@ def main():
     
     #=== after everything, save initial profile (depends on how large the size if, I may choose to forward this step)
     shutil.move('initial.hdf5', 'initial_{}.hdf5'.format(jobID))
-    shutil.move('gamma-table_charm.dat', 'gamma-table_charm{}.dat'.format(config.get('qhat_args').split()[-1]))
+    shutil.move('gamma-table_charm.dat', 'gamma-table_charm{}.dat'.format(config.get('mu')))
 
 if __name__ == '__main__':
     main()
