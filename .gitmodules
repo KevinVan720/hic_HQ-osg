@@ -27,7 +27,7 @@
 	url = https://github.com/Yingru/qhat_pQCD.git
 [submodule "models/freestream"]
 	path = models/freestream
-	url = https://github.com/Duke-QCD/freestream.git
+	url = https://github.com/KevinVan720/freestream
 [submodule "models/frzout"]
 	path = models/frzout
 	url = https://github.com/Duke-QCD/frzout.git
